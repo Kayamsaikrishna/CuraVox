@@ -9,9 +9,9 @@ const router = express.Router();
 const aiSystem = new AdvancedMedicalAI();
 
 // @desc    Process voice command with advanced AI
-// @route   POST /api/ai/voice-command
+// @route   POST /api/ai/command
 // @access  Private
-router.post('/voice-command', protect, [
+router.post('/command', protect, [
   body('command', 'Voice command is required').not().isEmpty().trim(),
 ], async (req, res) => {
   try {
@@ -35,12 +35,12 @@ router.post('/voice-command', protect, [
     if (userProfile.medicalConditions || userProfile.medications || userProfile.allergies) {
       // Update user profile in AI system
       aiSystem.updateUserProfile(
-        userId, 
-        userProfile.medicalConditions || [], 
-        userProfile.medications || [], 
+        userId,
+        userProfile.medicalConditions || [],
+        userProfile.medications || [],
         userProfile.allergies || []
       );
-      
+
       // Get personalized response
       result.response = aiSystem.getPersonalizedResponse(userId, result.response);
     }

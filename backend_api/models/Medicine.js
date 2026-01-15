@@ -4,8 +4,7 @@ const medicineSchema = new mongoose.Schema({
   medicineName: {
     type: String,
     required: true,
-    trim: true,
-    index: true  // Remove the separate index() call to prevent duplicates
+    trim: true
   },
   genericName: {
     type: String,
