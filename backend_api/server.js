@@ -21,10 +21,7 @@ const connectDB = async () => {
   try {
     // Connect to MongoDB
     mongoose
-      .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/soniris', {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      })
+      .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/soniris')
       .then(async () => {
         console.log('MongoDB connected');
         // Run AI Health Check

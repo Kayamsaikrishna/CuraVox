@@ -7,6 +7,11 @@ Integrated system combining OCR, LLM, and medical expertise for comprehensive me
 import os
 import sys
 import logging
+
+# Suppress TensorFlow and OneDNN warnings
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=no info, 2=no warnings
+
 import time
 import json
 from datetime import datetime
