@@ -1,4 +1,4 @@
-# Backend API: Comprehensive Documentation
+# Backend API: Comprehensive Documentation (CuraVox)
 
 ## 1. System Overview
 The **Backend API** is the central nervous system of the application. It runs on **Node.js (v18)** with **Express** and handles:

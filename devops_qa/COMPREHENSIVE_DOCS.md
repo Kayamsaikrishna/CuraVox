@@ -1,4 +1,4 @@
-# DevOps & QA: Comprehensive Documentation
+# DevOps & QA: Comprehensive Documentation (CuraVox)
 
 ## 1. Deployment Architecture
 The system is designed for **Containerized Deployment** using Docker and Docker Compose. This ensures consistency across Development, Testing, and Production environments.

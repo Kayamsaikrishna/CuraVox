@@ -1,4 +1,4 @@
-# Frontend App: Comprehensive Documentation
+# Frontend App: Comprehensive Documentation (CuraVox)
 
 ## 1. System Overview
 The **Frontend App** is a modern, accessible Progressive Web App (PWA) built with **React 18** and **Vite**. It is designed specifically for **Blind and Visually Impaired Users**, featuring a Voice-First interface and high-contrast visuals.

@@ -1,7 +1,7 @@
-# AI/ML Engine: Comprehensive Documentation
+# AI/ML Engine: Comprehensive Documentation (CuraVox)
 
 ## 1. System Overview
-The **AI/ML Engine** is the intelligence core of the Medical AI Assistant. It is a hybrid system that combines **Deterministic Rule-Based Agents** (for safety and specific medical protocols) with **Generative Local LLMs** (for natural language understanding and empathy).
+The **AI/ML Engine** is the intelligence core of **CuraVox**. It is a hybrid system that combines **Deterministic Rule-Based Agents** (for safety and specific medical protocols) with **Generative Local LLMs** (for natural language understanding and empathy).
 
 ### Architecture Diagram
 ```mermaid
