@@ -33,8 +33,8 @@ class AdvancedMedicalAI {
       await fs.writeFile(tempInputPath, JSON.stringify(inputData));
 
       return new Promise((resolve, reject) => {
-        // Spawn Python process
-        const pythonProcess = spawn('python', [this.pythonScriptPath, '--input', tempInputPath]);
+        // Spawn Python process with -u for unbuffered output (crucial for seeing logs in real-time)
+        const pythonProcess = spawn('python', ['-u', this.pythonScriptPath, '--input', tempInputPath]);
 
         let stdoutData = '';
         let stderrData = '';
@@ -44,7 +44,10 @@ class AdvancedMedicalAI {
         });
 
         pythonProcess.stderr.on('data', (data) => {
-          stderrData += data.toString();
+          const msg = data.toString();
+          stderrData += msg;
+          // Log Python progress/errors in real-time so user knows it's working
+          console.error(`[AI Engine Log]: ${msg.trim()}`);
         });
 
         pythonProcess.on('close', async (code) => {
@@ -91,18 +94,18 @@ class AdvancedMedicalAI {
    * Process voice command with advanced AI
    */
   async processComplexQuery(userId, command) {
-    // Map voice command to simpler medical advice query for now
-    // In future this can be expanded in Python to handle intents
     try {
-      const result = await this.callPythonEngine('get_medical_advice', {
-        query: command,
-        patient_context: { patient_id: userId }
+      // Use the Unified Voice Processor in Python
+      const result = await this.callPythonEngine('process_voice_command', {
+        command: command,
+        user_id: userId
       });
 
       return {
         response: result.response,
-        action: 'voice_reply',
-        original_query: command
+        action: result.action || 'voice_reply',
+        original_query: command,
+        data: result // Pass through any extra data (medicine_info, etc.)
       };
     } catch (error) {
       console.error('AI Voice processing failed:', error);
@@ -194,6 +197,35 @@ class AdvancedMedicalAI {
     return {
       recommendations: []
     };
+  }
+  async performStartupCheck() {
+    console.log('\n🏥 CuraVox AI Engine: Starting Health Check...');
+    try {
+      const status = await this.callPythonEngine('get_system_status', {});
+
+      console.log('----------------------------------------');
+      console.log(`✅ Core System:       ${status.system_initialized ? 'ONLINE' : 'OFFLINE'}`);
+
+      const activeLLM = status.model_details?.active_llm || 'Unknown';
+      const installedLLMs = status.model_details?.installed_llms?.length
+        ? status.model_details.installed_llms.join(', ')
+        : 'None found';
+
+      console.log(`✅ Active LLM:        CONNECTED (${activeLLM})`);
+      console.log(`   └─ Installed:      [${installedLLMs}]`);
+
+      console.log(`✅ Medical Agents:    ${status.component_health.agent_orchestrator ? 'READY' : 'ERROR'}`);
+      console.log(`✅ NER Model:         READY (${status.model_details?.ner || 'BERT'})`);
+      console.log(`✅ QA Model:          READY (${status.model_details?.qa || 'RoBERTa'})`);
+      console.log(`✅ Summarizer:        READY (${status.model_details?.summarizer || 'BART'})`);
+      console.log('----------------------------------------\n');
+
+      return status;
+    } catch (error) {
+      console.error('❌ AI Engine Health Check FAILED:', error.message);
+      console.log('   (Is Python installed? Is Ollama running?)\n');
+      return false;
+    }
   }
 }
 

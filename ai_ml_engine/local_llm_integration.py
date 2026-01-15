@@ -45,18 +45,12 @@ class LocalMedicalLLM:
             print(f"Found available models: {available_models}")
             
             # Priority list of models to use
+            # Priority list of models to use - 'medllama2' is the specific Medical AI model we need.
             priority_models = [
-                "llama2-medical",
-                "medllama2",
-                "llama3.2:latest",
-                "llama3.2",
-                "llama3.1:latest",
-                "llama3.1",
-                "mistral:latest",
-                "mistral",
-                "llama2:7b",
-                "llama2",
-                "phi3:latest"
+                "medllama2",       # PRIMARY: Medical-finetuned Llama2
+                "llama3-medical",  # Future-proof
+                "llama3.2",        # Good general purpose fallback
+                "mistral"          # Lightweight fallback
             ]
             
             for model in priority_models:

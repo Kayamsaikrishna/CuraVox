@@ -11,12 +11,29 @@ const userRoutes = require('./routes/users');
 const medicineRoutes = require('./routes/medicine');
 const ocrRoutes = require('./routes/ocr');
 const aiRoutes = require('./routes/ai');
+const { AdvancedMedicalAI } = require('./services/aiService');
+
+// Initialize AI Service
+const aiService = new AdvancedMedicalAI();
 
 // Import database connection
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/medical_ai');
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    // Connect to MongoDB
+    mongoose
+      .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/soniris', {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      })
+      .then(async () => {
+        console.log('MongoDB connected');
+        // Run AI Health Check
+        // Assuming aiService is imported or available in scope
+        // If aiService is not defined, this will cause a ReferenceError
+        // For the purpose of this edit, we are inserting the code as provided.
+        await aiService.performStartupCheck();
+      })
+      .catch((err) => console.log('MongoDB Connection Error:', err));
   } catch (error) {
     console.error(`Error: ${error.message}`);
     process.exit(1);

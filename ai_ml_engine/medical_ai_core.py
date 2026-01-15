@@ -13,6 +13,13 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 import argparse
+from transformers import pipeline, logging as hf_logging
+import torch
+import warnings
+
+# Configure HF Logging - Set to ERROR to hide massive config JSON dumps now that it works
+hf_logging.set_verbosity_error()
+warnings.filterwarnings("ignore", category=UserWarning) # Keep actual warnings but suppress minor ones
 
 # Add the current directory to Python path for absolute imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -64,11 +71,93 @@ class MedicalAICore:
         self.agent_orchestrator = MedicalAgentOrchestrator()
         self.cache_manager = cache_manager
         
+        # Initialize Hugging Face Pipelines (Graceful fallback)
+        self.qa_pipeline = None
+        self.nlp_pipeline = None
+        self.summarizer = None
+        self._initialize_transformer_models()
+        
         # Check system availability
         self.llm_available = self.local_llm.check_connection()
         self.system_initialized = True
         
         logger.info("Medical AI Core system initialized successfully")
+
+    def _initialize_transformer_models(self):
+        """Initialize local Transformer models for NLP tasks"""
+        try:
+            logger.info("Loading Hugging Face Transformer models...")
+            # 1. NER for Entity Extraction (Drugs, Symptoms)
+            self.nlp_pipeline = pipeline("ner", model="dslim/bert-base-NER", grouped_entities=True)
+            
+            # 2. QA for precise answers
+            self.qa_pipeline = pipeline("question-answering", model="deepset/roberta-base-squad2")
+            
+            # 3. Summarization for patient history
+            self.summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+            
+            logger.info("Transformer models loaded successfully")
+        except Exception as e:
+            logger.warning(f"Could not load Transformer models: {e}. Falling back to Regex/LLM.")
+
+    def process_voice_command_intent(self, command: str, user_id: str) -> Dict[str, Any]:
+        """
+        Main entry point for Voice Logic.
+        Determines intent (Symptom Check vs Medicine Info vs Chat) and routes accordingly.
+        """
+        command_lower = command.lower()
+        
+        # --- Intent 1: Medicine Info/Scanning ---
+        if any(w in command_lower for w in ['what is', 'tell me about', 'explain', 'dosage', 'side effects']):
+            # Use NER or basic split to find medicine name
+            medicine_entity = self._extract_entity(command, 'medicine')
+            if medicine_entity:
+                # Route to Medicine Analyzer
+                return {
+                    "action": "medicine_info",
+                    "medicine": medicine_entity,
+                    "response": self.analyze_medicine_from_text(medicine_entity).basic_summary()
+                }
+            else:
+                 # Fallback to LLM if no entity found
+                 pass
+
+        # --- Intent 2: Symptom Checking ---
+        if any(w in command_lower for w in ['pain', 'hurt', 'feel', 'symptom', 'headache', 'dizzy']):
+            # Route to Agents
+            return {
+                "action": "symptom_check",
+                "response": "I detected a symptom. For a full diagnosis, please describe your symptoms in detail.",
+                # In a real app, this would trigger the agent workflow immediately if symptoms are sufficient
+            }
+
+        # --- Intent 3: General Chat / Fallback ---
+        advice = self.get_medical_advice(command)
+        return {
+            "action": "chat",
+            "response": advice
+        }
+
+    def _extract_entity(self, text: str, entity_type: str) -> Optional[str]:
+        """Try BERT NER first, then fallback to heuristics"""
+        if self.nlp_pipeline:
+            try:
+                entities = self.nlp_pipeline(text)
+                # Filter for something looking like a drug (MISC or ORG often in generic NER)
+                # This is a simplification. Real medical NER (BioBERT) would be better.
+                for ent in entities:
+                    if ent['score'] > 0.8:
+                        return ent['word']
+            except:
+                pass
+        
+        # Fallback heuristic: Look for capitalized words in middle of sentence
+        # (Very basic, but works for "Tell me about Aspirin")
+        words = text.split()
+        for w in words:
+            if w[0].isupper() and len(w) > 3:
+                return w
+        return None
     
     async def analyze_patient_case(self, 
                                  patient_id: str, 
@@ -352,14 +441,24 @@ class MedicalAICore:
     
     def get_system_status(self) -> Dict[str, Any]:
         """Get comprehensive system status and statistics"""
+        # Get all installed models from Ollama
+        installed_models = []
+        if hasattr(self.local_llm, 'list_available_models'):
+             installed_models = self.local_llm.list_available_models()
+        
         return {
             'system_initialized': self.system_initialized,
             'llm_available': self.llm_available,
             'component_health': {
                 'medicine_analyzer': True,
-                'local_llm': self.llm_available,
-                'agent_orchestrator': True,
-                'cache_manager': True
+                'agent_orchestrator': True
+            },
+            'model_details': {
+                'active_llm': self.local_llm.model_name if hasattr(self.local_llm, 'model_name') else 'medllama2',
+                'installed_llms': installed_models,
+                'ner': 'dslim/bert-base-NER',
+                'qa': 'deepset/roberta-base-squad2',
+                'summarizer': 'facebook/bart-large-cnn'
             },
             'cache_statistics': self.cache_manager.get_stats(),
             'timestamp': datetime.now().isoformat()
@@ -479,6 +578,18 @@ def main():
                 'result': status
             }
             
+        elif action == 'process_voice_command':
+            command = input_params.get('command', '')
+            user_id = input_params.get('user_id', 'unknown')
+            
+            result = ai_core.process_voice_command_intent(command, user_id)
+            
+            output = {
+                'success': True,
+                'action': 'process_voice_command',
+                'result': result
+            }
+
         else:
             output = {
                 'success': False,

@@ -18,33 +18,43 @@ const HomePage = () => {
       mainRef.current.focus();
     }
 
+    // Timer for clock only
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
-    
+
     // Refresh data periodically
     const refreshTimer = setInterval(() => {
       actions.refreshAll();
-    }, 15000); // Refresh every 15 seconds
-    
-    // Initial refresh
-    actions.refreshAll();
-    
-    // Announce welcome message
-    const welcomeMessage = `Welcome to Medical Assistant. Today is ${currentTime.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    })}. You have ${state.stats.medicines} medicines, ${state.stats.activeReminders} active reminders, and ${state.stats.dosesToday} doses taken today.`;
-    setAnnouncedText(welcomeMessage);
-    speak(welcomeMessage);
-    
+    }, 15000);
+
     return () => {
       clearInterval(timer);
       clearInterval(refreshTimer);
     };
-  }, [speak, currentTime, actions, state.stats]);
+  }, []); // Empty dependency array for intervals
+
+  // Separate effect for Welcome Message - Run once on mount
+  useEffect(() => {
+    // Initial refresh
+    actions.refreshAll();
+
+    // Announce welcome message
+    const now = new Date();
+    const welcomeMessage = `Welcome to CuraVox. Today is ${now.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })}. You're doing great!`;
+
+    // Use a small timeout to ensure voice service is ready
+    setTimeout(() => {
+      setAnnouncedText(welcomeMessage);
+      speak(welcomeMessage);
+    }, 1000);
+
+  }, []); // Run ONLY once on mount
 
   // Function to announce text for screen readers
   const announce = (text) => {
@@ -172,16 +182,16 @@ const HomePage = () => {
   ];
 
   // Get upcoming reminders from state
-  const upcomingReminders = state.reminders.filter(reminder => 
-    reminder.isActive && 
+  const upcomingReminders = state.reminders.filter(reminder =>
+    reminder.isActive &&
     new Date(reminder.nextDue) > new Date()
   );
 
   return (
-    <div 
-      style={{ 
-        backgroundColor: '#f0f9ff', 
-        minHeight: '100vh', 
+    <div
+      style={{
+        backgroundColor: '#f0f9ff',
+        minHeight: '100vh',
         padding: '20px',
         fontFamily: 'Arial, sans-serif',
         lineHeight: '1.6'
@@ -191,8 +201,8 @@ const HomePage = () => {
       ref={mainRef}
     >
       {/* Skip link for screen readers */}
-      <a 
-        href="#main-content" 
+      <a
+        href="#main-content"
         onClick={skipToMainContent}
         style={{
           position: 'absolute',
@@ -227,24 +237,24 @@ const HomePage = () => {
       </a>
 
       {/* Screen reader announcement area */}
-      <div 
-        aria-live="assertive" 
-        aria-atomic="true" 
-        style={{ 
-          position: 'absolute', 
-          left: '-10000px', 
-          width: '1px', 
-          height: '1px', 
-          overflow: 'hidden' 
+      <div
+        aria-live="assertive"
+        aria-atomic="true"
+        style={{
+          position: 'absolute',
+          left: '-10000px',
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden'
         }}
       >
         {announcedText}
       </div>
 
-      <div 
+      <div
         id="main-content"
-        style={{ 
-          maxWidth: '1000px', 
+        style={{
+          maxWidth: '1000px',
           margin: '0 auto',
           backgroundColor: 'white',
           borderRadius: '8px',
@@ -256,10 +266,10 @@ const HomePage = () => {
         tabIndex="-1"
       >
         <header style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h1 
-            style={{ 
-              fontSize: '36px', 
-              fontWeight: 'bold', 
+          <h1
+            style={{
+              fontSize: '36px',
+              fontWeight: 'bold',
               color: '#1e40af',
               marginBottom: '10px',
               borderBottom: '4px solid #3b82f6',
@@ -269,53 +279,53 @@ const HomePage = () => {
           >
             Medical Assistant
           </h1>
-          <p 
-            style={{ 
-              fontSize: '22px', 
+          <p
+            style={{
+              fontSize: '22px',
               color: '#4b5563',
               marginBottom: '5px'
             }}
             tabIndex="0"
           >
-            {currentTime.toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
+            {currentTime.toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
             })}
           </p>
-          <p 
-            style={{ 
-              fontSize: '18px', 
-              color: '#6b7280' 
+          <p
+            style={{
+              fontSize: '18px',
+              color: '#6b7280'
             }}
             tabIndex="0"
           >
-            {currentTime.toLocaleTimeString('en-US', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
+            {currentTime.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit'
             })}
           </p>
         </header>
 
         {/* Keyboard Shortcuts Info */}
-        <section style={{ 
-          marginBottom: '25px', 
-          padding: '20px', 
-          backgroundColor: '#e0f2fe', 
+        <section style={{
+          marginBottom: '25px',
+          padding: '20px',
+          backgroundColor: '#e0f2fe',
           border: '3px solid #0ea5e9',
-          borderRadius: '8px' 
+          borderRadius: '8px'
         }}>
-          <h2 
-            style={{ 
-              fontSize: '18px', 
-              fontWeight: '600', 
+          <h2
+            style={{
+              fontSize: '18px',
+              fontWeight: '600',
               color: '#0284c7',
               marginBottom: '10px'
             }}
             tabIndex="0"
           >
-            Keyboard Shortcuts: 
+            Keyboard Shortcuts:
             <span style={{ fontSize: '16px', fontWeight: 'normal', display: 'block', marginTop: '5px' }}>
               Alt+O (Overview) • Alt+Q (Quick Actions) • Alt+R (Reminders) • Alt+E (Emergency)
             </span>
@@ -323,17 +333,17 @@ const HomePage = () => {
         </section>
 
         {/* Stats Cards */}
-        <section 
+        <section
           id="overview-section"
           style={{ marginBottom: '30px' }}
           aria-labelledby="overview-heading"
           tabIndex="-1"
         >
-          <h2 
+          <h2
             id="overview-heading"
-            style={{ 
-              fontSize: '26px', 
-              fontWeight: '600', 
+            style={{
+              fontSize: '26px',
+              fontWeight: '600',
               color: '#374151',
               marginBottom: '20px',
               borderBottom: '4px solid #60a5fa',
@@ -366,13 +376,13 @@ const HomePage = () => {
               Jump
             </button>
           </h2>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
-            gap: '25px' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '25px'
           }}>
             {statsCards.map((stat) => (
-              <div 
+              <div
                 key={stat.id}
                 role="region"
                 aria-labelledby={`stat-title-${stat.id}`}
@@ -387,7 +397,7 @@ const HomePage = () => {
                 onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
                 onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               >
-                <div 
+                <div
                   id={`stat-title-${stat.id}`}
                   style={{ fontSize: '36px', fontWeight: 'bold', color: stat.color, marginBottom: '12px' }}
                 >
@@ -405,17 +415,17 @@ const HomePage = () => {
         </section>
 
         {/* Quick Actions */}
-        <section 
+        <section
           id="quick-actions-section"
           style={{ marginBottom: '30px' }}
           aria-labelledby="quick-actions-heading"
           tabIndex="-1"
         >
-          <h2 
+          <h2
             id="quick-actions-heading"
-            style={{ 
-              fontSize: '26px', 
-              fontWeight: '600', 
+            style={{
+              fontSize: '26px',
+              fontWeight: '600',
               color: '#374151',
               marginBottom: '20px',
               borderBottom: '4px solid #60a5fa',
@@ -448,13 +458,13 @@ const HomePage = () => {
               Jump
             </button>
           </h2>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-            gap: '25px' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '25px'
           }}>
             {quickActions.map(action => (
-              <Link 
+              <Link
                 key={action.id}
                 to={action.link}
                 onClick={() => {
@@ -490,15 +500,15 @@ const HomePage = () => {
                 <div style={{ fontSize: '18px', fontWeight: 'normal', marginTop: '12px' }}>
                   {action.description}
                 </div>
-                <div style={{ 
-                  position: 'absolute', 
-                  top: '12px', 
-                  right: '12px', 
-                  backgroundColor: action.color, 
-                  color: 'white', 
-                  padding: '6px 10px', 
-                  borderRadius: '6px', 
-                  fontSize: '14px' 
+                <div style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  backgroundColor: action.color,
+                  color: 'white',
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  fontSize: '14px'
                 }}>
                   {action.shortcut}
                 </div>
@@ -508,17 +518,17 @@ const HomePage = () => {
         </section>
 
         {/* Upcoming Reminders */}
-        <section 
+        <section
           id="reminders-section"
           style={{ marginBottom: '30px' }}
           aria-labelledby="reminders-heading"
           tabIndex="-1"
         >
-          <h2 
+          <h2
             id="reminders-heading"
-            style={{ 
-              fontSize: '26px', 
-              fontWeight: '600', 
+            style={{
+              fontSize: '26px',
+              fontWeight: '600',
               color: '#374151',
               marginBottom: '20px',
               borderBottom: '4px solid #60a5fa',
@@ -551,15 +561,15 @@ const HomePage = () => {
               Jump
             </button>
           </h2>
-          
+
           {upcomingReminders.length > 0 ? (
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: '1fr', 
-              gap: '25px' 
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr',
+              gap: '25px'
             }}>
               {upcomingReminders.map(reminder => (
-                <div 
+                <div
                   key={reminder.id}
                   role="article"
                   aria-labelledby={`reminder-title-${reminder.id}`}
@@ -574,9 +584,9 @@ const HomePage = () => {
                   }}
                 >
                   <div id={`reminder-title-${reminder.id}`}>
-                    <h3 style={{ 
-                      fontSize: '22px', 
-                      fontWeight: '600', 
+                    <h3 style={{
+                      fontSize: '22px',
+                      fontWeight: '600',
                       color: '#0284c7',
                       marginBottom: '10px'
                     }}>
@@ -664,17 +674,17 @@ const HomePage = () => {
         </section>
 
         {/* Accessibility Features */}
-        <section style={{ 
-          backgroundColor: '#e0f2fe', 
+        <section style={{
+          backgroundColor: '#e0f2fe',
           border: '4px solid #0ea5e9',
-          borderRadius: '12px', 
+          borderRadius: '12px',
           padding: '35px',
           marginBottom: '25px'
         }}>
-          <h2 
-            style={{ 
-              fontSize: '24px', 
-              fontWeight: '600', 
+          <h2
+            style={{
+              fontSize: '24px',
+              fontWeight: '600',
               color: '#0284c7',
               marginBottom: '18px',
               display: 'flex',
@@ -685,7 +695,7 @@ const HomePage = () => {
             <span style={{ fontSize: '32px', marginRight: '10px' }}>♿</span>
             Accessibility Features
           </h2>
-          <ul style={{ 
+          <ul style={{
             color: '#0284c7',
             paddingLeft: '30px',
             fontSize: '18px',
@@ -719,20 +729,20 @@ const HomePage = () => {
         </section>
 
         {/* Emergency Information */}
-        <section 
+        <section
           id="emergency-section"
-          style={{ 
-            padding: '35px', 
-            backgroundColor: '#fef2f2', 
+          style={{
+            padding: '35px',
+            backgroundColor: '#fef2f2',
             border: '4px solid #fecaca',
-            borderRadius: '12px' 
+            borderRadius: '12px'
           }}
           tabIndex="-1"
         >
-          <h2 
-            style={{ 
-              fontSize: '24px', 
-              fontWeight: '600', 
+          <h2
+            style={{
+              fontSize: '24px',
+              fontWeight: '600',
               color: '#b91c1c',
               marginBottom: '18px',
               display: 'flex',
@@ -743,7 +753,7 @@ const HomePage = () => {
             <span style={{ fontSize: '32px', marginRight: '10px' }}>🚨</span>
             Emergency Information
           </h2>
-          <ul style={{ 
+          <ul style={{
             color: '#b91c1c',
             paddingLeft: '30px',
             fontSize: '18px',
