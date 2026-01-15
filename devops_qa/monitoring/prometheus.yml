@@ -1,0 +1,139 @@
+# Prometheus configuration for Medical AI Assistant
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Backend API metrics
+  - job_name: 'backend-api'
+    static_configs:
+      - targets: ['backend:5000']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    scrape_timeout: 3s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # MongoDB metrics (requires MongoDB exporter)
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['mongodb_exporter:9216']
+
+  # Redis metrics (requires Redis exporter)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis_exporter:9121']
+
+  # Node.js application metrics (if using application-specific metrics)
+  - job_name: 'node-apps'
+    static_configs:
+      - targets: ['backend:5000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+# Custom alerting rules for medical application
+groups:
+  - name: medical_app_alerts
+    rules:
+      # API response time alerts
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time on {{ $labels.job }}"
+          description: "{{ $labels.job }} has a 95th percentile response time above 2 seconds for more than 2 minutes."
+
+      # Error rate alerts
+      - alert: HighErrorRate
+        expr: 100 * (rate(http_requests_total{status=~"5.."}[5m]) or vector(0)) / rate(http_requests_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "{{ $labels.job }} is experiencing {{ $value | humanize }}% errors for more than 2 minutes."
+
+      # Memory usage alerts
+      - alert: HighMemoryUsage
+        expr: 100 * (node_memory_MemTotal_bytes - node_memory_MemFree_bytes) / node_memory_MemTotal_bytes > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "{{ $labels.instance }} has memory usage above 85% for more than 5 minutes."
+
+      # API availability alerts
+      - alert: APIUnreachable
+        expr: up{job="backend-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API is unreachable"
+          description: "The backend API service has been down for more than 1 minute."
+
+      # Database connection alerts
+      - alert: DatabaseDown
+        expr: up{job="mongodb"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database is unreachable"
+          description: "The MongoDB database has been down for more than 1 minute."
+
+      # OCR processing alerts
+      - alert: HighOCRProcessingTime
+        expr: histogram_quantile(0.95, rate(ocr_processing_duration_seconds_bucket[5m])) > 10
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High OCR processing time"
+          description: "OCR processing has a 95th percentile duration above 10 seconds for more than 3 minutes."
+
+      # Medicine database alerts
+      - alert: LowMedicineConfidence
+        expr: histogram_quantile(0.5, rate(medicine_recognition_confidence_bucket[5m])) < 70
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low medicine recognition confidence"
+          description: "Medicine recognition confidence has dropped below 70% for more than 5 minutes."
+
+      # User authentication alerts
+      - alert: HighAuthFailureRate
+        expr: 100 * rate(auth_failed_total[5m]) / rate(auth_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate has exceeded 10% for more than 2 minutes."

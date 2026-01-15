@@ -1,0 +1,320 @@
+/* Medical AI Assistant - Light Theme for Better Visibility */
+/* Designed for optimal readability and user experience */
+
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 18px;
+    line-height: 1.6;
+    background-color: #ffffff;
+    color: #333333;
+    min-height: 100vh;
+}
+
+/* Screen reader only content */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Main application container */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    max-width: 100%;
+    margin: 0 auto;
+    background-color: #f8f9fa;
+}
+
+/* Header styles */
+.app-header {
+    background-color: #ffffff;
+    padding: 1.5rem;
+    border-bottom: 2px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Main content area */
+.app-main {
+    flex: 1;
+    padding: 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #ffffff;
+}
+
+.voice-interface {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    padding: 2rem;
+}
+
+/* Status indicator */
+.status-indicator {
+    text-align: center;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    background-color: #f1f3f4;
+    border-radius: 10px;
+    border: 2px solid #dadce0;
+}
+
+#statusText {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #5f6368;
+}
+
+.state-listening {
+    color: #0f9d58;
+    animation: pulse 1s infinite;
+    font-weight: bold;
+}
+
+.state-ready {
+    color: #4285f4;
+    font-weight: 600;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* Command area */
+.command-area {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.primary-button {
+    background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+    color: white;
+    border: none;
+    padding: 1.8rem 2.5rem;
+    font-size: 1.4rem;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 220px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.2rem;
+    box-shadow: 0 4px 8px rgba(66, 133, 244, 0.3);
+}
+
+.primary-button:hover,
+.primary-button:focus {
+    background: linear-gradient(135deg, #3367d6 0%, #2e8b57 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(66, 133, 244, 0.4);
+    outline: 3px solid #aecbfa;
+}
+
+.button-text {
+    font-weight: 600;
+}
+
+.button-state {
+    background-color: rgba(255, 255, 255, 0.25);
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Command history */
+.command-history {
+    margin-top: 2rem;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    padding: 1.5rem;
+    border: 1px solid #e9ecef;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.history-list {
+    list-style: none;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.history-item {
+    padding: 0.8rem;
+    border-bottom: 1px solid #e9ecef;
+    font-family: 'Consolas', 'Courier New', monospace;
+    color: #495057;
+    background-color: #ffffff;
+    border-radius: 4px;
+    margin-bottom: 0.3rem;
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+
+/* Results area */
+.results-area {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 2rem;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    min-height: 250px;
+}
+
+.results-content {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.spoken-result {
+    padding: 1.2rem;
+    margin-bottom: 1.2rem;
+    background-color: #f1f8e9;
+    border-left: 4px solid #4caf50;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.spoken-result p {
+    margin: 0;
+    line-height: 1.7;
+    color: #2e7d32;
+    font-size: 1.1rem;
+}
+
+.welcome-message {
+    text-align: center;
+    color: #666666;
+    font-style: italic;
+    padding: 2.5rem;
+    font-size: 1.2rem;
+}
+
+/* Focus states for accessibility */
+.focused {
+    outline: 3px solid #ff9800 !important;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.3) !important;
+}
+
+button:focus,
+[role="button"]:focus {
+    outline: 3px solid #ff9800;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.3);
+}
+
+/* Hidden elements for screen readers */
+[aria-hidden="true"] {
+    display: none;
+}
+
+/* Footer */
+.app-footer {
+    background-color: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    padding: 1.5rem;
+    text-align: center;
+    color: #666666;
+}
+
+.footer-info p {
+    margin: 0.3rem 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .primary-button {
+        padding: 1.5rem 2rem;
+        font-size: 1.2rem;
+        min-width: 180px;
+    }
+    
+    .app-main {
+        padding: 1rem;
+    }
+    
+    .voice-interface {
+        padding: 1.5rem;
+    }
+    
+    .status-indicator {
+        padding: 1.2rem;
+    }
+    
+    body {
+        font-size: 16px;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    body {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .primary-button {
+        border: 3px solid #000000;
+    }
+    
+    .status-indicator {
+        border: 3px solid #000000;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .primary-button:hover,
+    .primary-button:focus {
+        transform: none;
+    }
+}
+
+/* Print styles */
+@media print {
+    .primary-button,
+    .command-history,
+    .status-indicator {
+        display: none;
+    }
+    
+    .results-content {
+        overflow: visible;
+        max-height: none;
+    }
+    
+    body {
+        background-color: #ffffff;
+        color: #000000;
+    }
+}

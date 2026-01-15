@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medicine Scanner - Enhanced Prototype</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .camera-section {
+            text-align: center;
+        }
+
+        .camera-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        #video {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        #canvas {
+            display: none;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 150px;
+        }
+
+        .btn-small {
+            min-width: 120px;
+            padding: 10px 18px;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #56ab2f, #a8e6cf);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(86, 171, 47, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(45deg, #f093fb, #f5576c);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(240, 147, 251, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-info {
+            background: linear-gradient(45deg, #17a2b8, #20c997);
+            color: white;
+        }
+
+        .btn-info:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(23, 162, 184, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results-section {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 3px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 2px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .extracted-text {
+            background: #f8f9ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .confidence-score {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .confidence-high {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .confidence-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .confidence-low {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .medicine-info {
+            background: #f0fff4;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 2px solid #90ee90;
+        }
+
+        .medicine-suggestion {
+            background: #fff3cd;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 2px solid #ffc107;
+        }
+
+        .medicine-name {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #2d5016;
+            margin-bottom: 15px;
+        }
+
+        .suggestion-text {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .info-content {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .side-effects {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+        }
+
+        .dosage {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+
+        .uses {
+            background: #e2e3ea;
+            border: 1px solid #d6d8db;
+        }
+
+        .voice-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .voice-btn, .emergency-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .voice-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+        }
+
+        .emergency-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        }
+
+        .voice-btn:hover, .emergency-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .emergency-btn:hover {
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+        }
+
+        .voice-btn.speaking {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .file-input {
+            margin: 15px 0;
+        }
+
+        .file-input input {
+            display: none;
+        }
+
+        .file-input label {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-input label:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: none;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .reminder-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .reminder-info {
+            flex: 1;
+        }
+
+        .reminder-medicine {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .reminder-time {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .reminder-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-mini {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            min-width: auto;
+        }
+
+        .suggestions-list {
+            margin-top: 15px;
+        }
+
+        .suggestion-item {
+            background: #e9ecef;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .suggestion-item:hover {
+            background: #dee2e6;
+        }
+
+        .improvement-tips {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .improvement-tips h4 {
+            color: #004085;
+            margin-bottom: 10px;
+        }
+
+        .improvement-tips ul {
+            color: #004085;
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Enhanced Medicine Scanner</h1>
+            <p>Scan, Recognize, Set Reminders & Emergency Support</p>
+        </div>
+
+        <div class="main-content">
+            <div class="card camera-section">
+                <h2 class="section-title">📷 Camera Scanner</h2>
+                <div class="camera-container">
+                    <video id="video" autoplay muted></video>
+                    <canvas id="canvas"></canvas>
+                </div>
+                <div class="controls">
+                    <button id="startCamera" class="btn btn-primary">Start Camera</button>
+                    <button id="captureBtn" class="btn btn-success" disabled>Capture & Scan</button>
+                    <div class="file-input">
+                        <label for="fileInput">📁 Upload Image</label>
+                        <input type="file" id="fileInput" accept="image/*">
+                    </div>
+                    <div class="control-row">
+                        <button id="setReminderBtn" class="btn btn-info btn-small">⏰ Set Reminder</button>
+                        <button id="viewRemindersBtn" class="btn btn-info btn-small">📋 View Reminders</button>
+                    </div>
+                    <button id="stopCamera" class="btn btn-warning" disabled>Stop Camera</button>
+                </div>
+            </div>
+
+            <div class="card results-section">
+                <h2 class="section-title">📋 Scan Results</h2>
+                <div id="results">
+                    <div class="no-results">
+                        <p>👆 Capture or upload an image to start scanning</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="voice-controls">
+        <button id="emergencyBtn" class="emergency-btn" title="Emergency Call">🚨</button>
+        <button id="speakBtn" class="voice-btn" title="Click to hear medicine details">🔊</button>
+    </div>
+
+    <!-- Reminder Modal -->
+    <div id="reminderModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>⏰ Set Medicine Reminder</h2>
+            <div class="form-group">
+                <label class="form-label">Medicine Name:</label>
+                <input type="text" id="reminderMedicine" class="form-input" placeholder="Enter medicine name">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Dosage:</label>
+                <input type="text" id="reminderDosage" class="form-input" placeholder="e.g., 1 tablet">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Time:</label>
+                <input type="time" id="reminderTime" class="form-input">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Frequency:</label>
+                <select id="reminderFreq" class="form-select">
+                    <option value="once">Once</option>
+                    <option value="daily">Daily</option>
+                    <option value="twice">Twice Daily</option>
+                    <option value="thrice">Three Times Daily</option>
+                    <option value="weekly">Weekly</option>
+                </select>
+            </div>
+            <div class="control-row">
+                <button id="saveReminderBtn" class="btn btn-success">Save Reminder</button>
+                <button id="cancelReminderBtn" class="btn btn-warning">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Reminders Modal -->
+    <div id="viewRemindersModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>📋 Your Medicine Reminders</h2>
+            <div id="remindersList">
+                <p style="text-align: center; color: #666; font-style: italic;">No reminders set yet</p>
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="closeRemindersBtn" class="btn btn-primary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Medicine Database with confidence matching
+        const medicineDatabase = {
+            "paracetamol": {
+                name: "Paracetamol",
+                aliases: ["acetaminophen", "tylenol", "panadol", "calpol"],
+                uses: "Pain relief, fever reduction, headaches, muscle aches",
+                sideEffects: "Nausea, rash, blood disorders (rare), liver damage with overdose",
+                dosage: "Adults: 500mg-1000mg every 4-6 hours. Maximum 4000mg per day",
+                precautions: "Do not exceed recommended dose. Avoid alcohol consumption."
+            },
+            "ibuprofen": {
+                name: "Ibuprofen",
+                aliases: ["advil", "nurofen", "brufen", "motrin"],
+                uses: "Pain relief, inflammation reduction, fever reduction",
+                sideEffects: "Stomach upset, dizziness, rash, kidney problems",
+                dosage: "Adults: 200mg-400mg every 4-6 hours. Maximum 1200mg per day",
+                precautions: "Take with food. Avoid if you have stomach ulcers."
+            },
+            "aspirin": {
+                name: "Aspirin",
+                aliases: ["acetylsalicylic acid", "disprin", "ecosprin"],
+                uses: "Pain relief, fever reduction, blood clot prevention",
+                sideEffects: "Stomach irritation, bleeding, ringing in ears",
+                dosage: "Adults: 300mg-600mg every 4 hours. Maximum 4000mg per day",
+                precautions: "Not for children under 16. Take with food."
+            },
+            "amoxicillin": {
+                name: "Amoxicillin",
+                aliases: ["amoxil", "augmentin", "clavulanate"],
+                uses: "Bacterial infections, pneumonia, bronchitis, ear infections",
+                sideEffects: "Diarrhea, nausea, vomiting, rash, allergic reactions",
+                dosage: "Adults: 250mg-500mg three times daily for 7-10 days",
+                precautions: "Complete full course. Inform doctor of any allergies."
+            },
+            "metformin": {
+                name: "Metformin",
+                aliases: ["glucophage", "glycomet", "diabex"],
+                uses: "Type 2 diabetes management, blood sugar control",
+                sideEffects: "Nausea, diarrhea, stomach upset, metallic taste",
+                dosage: "Adults: 500mg twice daily with meals. Can increase gradually",
+                precautions: "Take with food. Monitor blood sugar levels regularly."
+            },
+            "lisinopril": {
+                name: "Lisinopril",
+                aliases: ["prinivil", "zestril", "ace inhibitor"],
+                uses: "High blood pressure, heart failure, kidney protection",
+                sideEffects: "Dry cough, dizziness, headache, fatigue",
+                dosage: "Adults: 10mg once daily. Can be adjusted by doctor",
+                precautions: "Rise slowly from sitting. Monitor blood pressure."
+            },
+            "omeprazole": {
+                name: "Omeprazole",
+                aliases: ["prilosec", "losec", "omez"],
+                uses: "Acid reflux, stomach ulcers, heartburn prevention",
+                sideEffects: "Headache, diarrhea, stomach pain, nausea",
+                dosage: "Adults: 20mg once daily before breakfast",
+                precautions: "Take before meals. Long-term use may affect bone health."
+            },
+            "atorvastatin": {
+                name: "Atorvastatin",
+                aliases: ["lipitor", "atorlip", "statin"],
+                uses: "High cholesterol, heart disease prevention",
+                sideEffects: "Muscle pain, headache, nausea, liver problems",
+                dosage: "Adults: 10mg-80mg once daily in evening",
+                precautions: "Avoid grapefruit juice. Monitor liver function."
+            },
+            "losartan": {
+                name: "Losartan",
+                aliases: ["cozaar", "losacar", "arb"],
+                uses: "High blood pressure, diabetic kidney disease, stroke prevention",
+                sideEffects: "Dizziness, fatigue, back pain, diarrhea",
+                dosage: "Adults: 50mg once daily. Can be increased to 100mg",
+                precautions: "Avoid salt substitutes. Monitor kidney function."
+            },
+            "cetirizine": {
+                name: "Cetirizine",
+                aliases: ["zyrtec", "cetrizet", "alerid"],
+                uses: "Allergies, hay fever, urticaria, runny nose",
+                sideEffects: "Drowsiness, dry mouth, fatigue, dizziness",
+                dosage: "Adults: 10mg once daily. Children: 5mg once daily",
+                precautions: "May cause drowsiness. Avoid alcohol."
+            }
+        };
+
+        // Global variables
+        let video, canvas, ctx;
+        let currentMedicineInfo = null;
+        let isSpeaking = false;
+        let reminders = JSON.parse(localStorage.getItem('medicineReminders') || '[]');
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+
+            setupEventListeners();
+            displayReminders();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('startCamera').addEventListener('click', startCamera);
+            document.getElementById('captureBtn').addEventListener('click', captureAndScan);
+            document.getElementById('stopCamera').addEventListener('click', stopCamera);
+            document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+            document.getElementById('speakBtn').addEventListener('click', speakMedicineInfo);
+            document.getElementById('emergencyBtn').addEventListener('click', handleEmergencyCall);
+            
+            // Reminder functionality
+            document.getElementById('setReminderBtn').addEventListener('click', openReminderModal);
+            document.getElementById('viewRemindersBtn').addEventListener('click', openViewRemindersModal);
+            document.getElementById('saveReminderBtn').addEventListener('click', saveReminder);
+            document.getElementById('cancelReminderBtn').addEventListener('click', closeModals);
+            document.getElementById('closeRemindersBtn').addEventListener('click', closeModals);
+
+            // Modal close functionality
+            document.querySelectorAll('.close').forEach(closeBtn => {
+                closeBtn.addEventListener('click', closeModals);
+            });
+
+            // Close modal when clicking outside
+            window.addEventListener('click', function(event) {
+                const reminderModal = document.getElementById('reminderModal');
+                const viewRemindersModal = document.getElementById('viewRemindersModal');
+                if (event.target === reminderModal || event.target === viewRemindersModal) {
+                    closeModals();
+                }
+            });
+        }
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+                video.srcObject = stream;
+                
+                document.getElementById('startCamera').disabled = true;
+                document.getElementById('captureBtn').disabled = false;
+                document.getElementById('stopCamera').disabled = false;
+                
+                showMessage('Camera started successfully! Point at medicine label and capture.', 'success');
+            } catch (error) {
+                showMessage('Error accessing camera: ' + error.message, 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            
+            document.getElementById('startCamera').disabled = false;
+            document.getElementById('captureBtn').disabled = true;
+            document.getElementById('stopCamera').disabled = true;
+            
+            showMessage('Camera stopped.', 'info');
+        }
+
+        function captureAndScan() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            const imageData = canvas.toDataURL('image/png');
+            processImage(imageData);
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    processImage(e.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function processImage(imageData) {
+            showLoading();
+            
+            Tesseract.recognize(imageData, 'eng', {
+                logger: m => {
+                    if (m.status === 'recognizing text') {
+                        updateLoadingMessage(`Processing... ${Math.round(m.progress * 100)}%`);
+                    }
+                }
+            }).then(({ data: { text, confidence } }) => {
+                displayResults(text, confidence);
+            }).catch(error => {
+                showMessage('OCR Error: ' + error.message, 'error');
+                hideLoading();
+            });
+        }
+
+        function displayResults(extractedText, confidence) {
+            hideLoading();
+            
+            const resultsDiv = document.getElementById('results');
+            let html = '';
+            
+            // Display confidence score
+            let confidenceClass = 'confidence-low';
+            let confidenceText = 'Low';
+            if (confidence > 80) {
+                confidenceClass = 'confidence-high';
+                confidenceText = 'High';
+            } else if (confidence > 50) {
+                confidenceClass = 'confidence-medium';
+                confidenceText = 'Medium';
+            }
+
+            // Display extracted text with confidence
+            html += `
+                <div class="extracted-text">
+                    <div class="info-label">📝 Extracted Text: 
+                        <span class="confidence-score ${confidenceClass}">
+                            Confidence: ${confidenceText} (${Math.round(confidence)}%)
+                        </span>
+                    </div>
+                    <div class="info-content">${extractedText || 'No text detected'}</div>
+                </div>
+            `;
+            
+            // DEBUG: Let's add some debugging info
+            console.log("Original extracted text:", extractedText);
+            console.log("Lowercase text:", extractedText.toLowerCase());
+            
+            // Search for medicine with confidence-based logic
+            const searchResult = searchMedicineWithConfidence(extractedText, confidence);
+            
+            // DEBUG: Log search result
+            console.log("Search result:", searchResult);
+            
+            if (searchResult.found) {
+                currentMedicineInfo = searchResult.medicine;
+                html += displayMedicineInfo(searchResult.medicine);
+                showMessage('Medicine found in database! Click the speaker icon to hear details.', 'success');
+            } else if (searchResult.suggestions.length > 0) {
+                html += displaySuggestions(searchResult.suggestions, confidence);
+                currentMedicineInfo = null;
+            } else {
+                html += displayNoResults(confidence);
+                currentMedicineInfo = null;
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        function searchMedicineWithConfidence(text, confidence) {
+            const searchText = text.toLowerCase().trim();
+            let result = { found: false, medicine: null, suggestions: [] };
+            
+            console.log("Searching for medicine in text:", searchText);
+            console.log("Available medicines:", Object.keys(medicineDatabase));
+            
+            // Method 1: Direct substring search (most reliable)
+            for (let medicineName in medicineDatabase) {
+                const medName = medicineName.toLowerCase();
+                console.log(`Checking if "${searchText}" contains "${medName}"`);
+                
+                if (searchText.includes(medName)) {
+                    console.log("FOUND MATCH:", medicineName);
+                    result.found = true;
+                    result.medicine = medicineDatabase[medicineName];
+                    return result;
+                }
+                
+                // Check aliases
+                for (let alias of medicineDatabase[medicineName].aliases) {
+                    const aliasLower = alias.toLowerCase();
+                    console.log(`Checking alias: "${aliasLower}"`);
+                    if (searchText.includes(aliasLower)) {
+                        console.log("FOUND ALIAS MATCH:", alias, "for", medicineName);
+                        result.found = true;
+                        result.medicine = medicineDatabase[medicineName];
+                        return result;
+                    }
+                }
+            }
+            
+            // Method 2: Word-by-word search
+            const textWords = searchText.split(/\s+/);
+            console.log("Text words:", textWords);
+            
+            for (let medicineName in medicineDatabase) {
+                const medWords = medicineName.toLowerCase().split(/\s+/);
+                
+                for (let medWord of medWords) {
+                    if (medWord.length > 3) {
+                        for (let textWord of textWords) {
+                            // Clean the text word from special characters
+                            const cleanTextWord = textWord.replace(/[^a-z]/g, '');
+                            console.log(`Comparing cleaned word "${cleanTextWord}" with "${medWord}"`);
+                            
+                            if (cleanTextWord === medWord || 
+                                (cleanTextWord.length > 3 && medWord.includes(cleanTextWord)) ||
+                                (medWord.length > 3 && cleanTextWord.includes(medWord))) {
+                                console.log("FOUND WORD MATCH:", medWord, "in", medicineName);
+                                result.found = true;
+                                result.medicine = medicineDatabase[medicineName];
+                                return result;
+                            }
+                        }
+                    }
+                }
+                
+                // Check aliases word by word
+                for (let alias of medicineDatabase[medicineName].aliases) {
+                    const aliasWords = alias.toLowerCase().split(/\s+/);
+                    for (let aliasWord of aliasWords) {
+                        if (aliasWord.length > 3) {
+                            for (let textWord of textWords) {
+                                const cleanTextWord = textWord.replace(/[^a-z]/g, '');
+                                if (cleanTextWord === aliasWord || 
+                                    (cleanTextWord.length > 3 && aliasWord.includes(cleanTextWord)) ||
+                                    (aliasWord.length > 3 && cleanTextWord.includes(aliasWord))) {
+                                    console.log("FOUND ALIAS WORD MATCH:", aliasWord, "for", medicineName);
+                                    result.found = true;
+                                    result.medicine = medicineDatabase[medicineName];
+                                    return result;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Method 3: Fuzzy matching for suggestions
+            console.log("No exact match found, looking for suggestions...");
+            
+            for (let medicineName in medicineDatabase) {
+                // Add to suggestions if there's any similarity
+                let shouldAddSuggestion = false;
+                
+                // Check main name similarity
+                const mainSimilarity = calculateSimilarity(searchText, medicineName.toLowerCase());
+                if (mainSimilarity > 0.2) {
+                    shouldAddSuggestion = true;
+                }
+                
+                // Check if any word from medicine name appears in text
+                const medWords = medicineName.toLowerCase().split(/\s+/);
+                for (let medWord of medWords) {
+                    if (medWord.length > 3 && searchText.includes(medWord)) {
+                        shouldAddSuggestion = true;
+                        break;
+                    }
+                }
+                
+                // Check aliases
+                for (let alias of medicineDatabase[medicineName].aliases) {
+                    const aliasSimilarity = calculateSimilarity(searchText, alias.toLowerCase());
+                    if (aliasSimilarity > 0.2 || searchText.includes(alias.toLowerCase())) {
+                        shouldAddSuggestion = true;
+                        break;
+                    }
+                }
+                
+                if (shouldAddSuggestion && !result.suggestions.find(s => s.name === medicineDatabase[medicineName].name)) {
+                    result.suggestions.push(medicineDatabase[medicineName]);
+                }
+            }
+            
+            console.log("Final result:", result);
+            return result;
+        }
+
+        function calculateSimilarity(str1, str2) {
+            const longer = str1.length > str2.length ? str1 : str2;
+            const shorter = str1.length > str2.length ? str2 : str1;
+            const editDistance = getEditDistance(longer, shorter);
+            return (longer.length - editDistance) / longer.length;
+        }
+
+        function getEditDistance(str1, str2) {
+            const matrix = [];
+            for (let i = 0; i <= str2.length; i++) {
+                matrix[i] = [i];
+            }
+            for (let j = 0; j <= str1.length; j++) {
+                matrix[0][j] = j;
+            }
+            for (let i = 1; i <= str2.length; i++) {
+                for (let j = 1; j <= str1.length; j++) {
+                    if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1,
+                            matrix[i][j - 1] + 1,
+                            matrix[i - 1][j] + 1
+                        );
+                    }
+                }
+            }
+            return matrix[str2.length][str1.length];
+        }
+
+        function displayMedicineInfo(medicine) {
+            return `
+                <div class="medicine-info">
+                    <div class="medicine-name">💊 ${medicine.name}</div>
+                    
+                    <div class="info-item uses">
+                        <div class="info-label">🎯 Uses:</div>
+                        <div class="info-content">${medicine.uses}</div>
+                    </div>
+                    
+                    <div class="info-item dosage">
+                        <div class="info-label">💉 Dosage:</div>
+                        <div class="info-content">${medicine.dosage}</div>
+                    </div>
+                    
+                    <div class="info-item side-effects">
+                        <div class="info-label">⚠️ Side Effects:</div>
+                        <div class="info-content">${medicine.sideEffects}</div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-label">🛡️ Precautions:</div>
+                        <div class="info-content">${medicine.precautions}</div>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 20px;">
+                        <div class="control-row">
+                            <button onclick="speakMedicineInfo()" class="btn btn-primary btn-small">
+                                🔊 Listen
+                            </button>
+                            <button onclick="setReminderForMedicine('${medicine.name}')" class="btn btn-info btn-small">
+                                ⏰ Set Reminder
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displaySuggestions(suggestions, confidence) {
+            let html = `
+                <div class="medicine-suggestion">
+                    <div class="suggestion-text">🤔 Did you mean one of these?</div>
+                    <p style="color: #856404; margin-bottom: 15px;">
+                        Low image quality detected (${Math.round(confidence)}% confidence). 
+                        Here are some similar medicines:
+                    </p>
+                    <div class="suggestions-list">
+            `;
+            
+            suggestions.slice(0, 3).forEach(medicine => {
+                html += `
+                    <div class="suggestion-item" onclick="selectSuggestion('${medicine.name}')">
+                        <strong>${medicine.name}</strong> - ${medicine.uses.substring(0, 60)}...
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                    <div class="improvement-tips">
+                        <h4>📸 Tips for better scanning:</h4>
+                        <ul>
+                            <li>Ensure good lighting on the medicine label</li>
+                            <li>Hold the camera steady and focus clearly</li>
+                            <li>Make sure the text is not blurry or tilted</li>
+                            <li>Clean the medicine package if it's dirty</li>
+                            <li>Try scanning different parts of the package</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+            
+            return html;
+        }
+
+        function displayNoResults(confidence) {
+            return `
+                <div class="error">
+                    <strong>⚠️ Medicine not found in database</strong><br>
+                    <p>Scan confidence: ${Math.round(confidence)}%</p>
+                    <br>
+                    ${confidence < 60 ? `
+                        <p><strong>Suggestions for better results:</strong></p>
+                        <div class="improvement-tips">
+                            <ul>
+                                <li>📸 Take a clearer photo with better lighting</li>
+                                <li>🔍 Focus on the medicine name clearly</li>
+                                <li>📱 Try scanning from a different angle</li>
+                                <li>🧹 Clean the package if it's dirty or damaged</li>
+                                <li>🔄 Try uploading a different image</li>
+                            </ul>
+                        </div>
+                    ` : `
+                        <p>The text was clearly detected, but this medicine is not in our database yet. 
+                        Please consult your pharmacist or doctor for detailed information.</p>
+                    `}
+                </div>
+            `;
+        }
+
+        function selectSuggestion(medicineName) {
+            for (let key in medicineDatabase) {
+                if (medicineDatabase[key].name === medicineName) {
+                    currentMedicineInfo = medicineDatabase[key];
+                    const resultsDiv = document.getElementById('results');
+                    resultsDiv.innerHTML = displayMedicineInfo(medicineDatabase[key]);
+                    showMessage(`Selected: ${medicineName}`, 'success');
+                    break;
+                }
+            }
+        }
+
+        function setReminderForMedicine(medicineName) {
+            document.getElementById('reminderMedicine').value = medicineName;
+            openReminderModal();
+        }
+
+        // Reminder functionality
+        function openReminderModal() {
+            document.getElementById('reminderModal').style.display = 'block';
+            // Auto-fill current time
+            const now = new Date();
+            const timeString = now.toTimeString().slice(0, 5);
+            document.getElementById('reminderTime').value = timeString;
+        }
+
+        function openViewRemindersModal() {
+            displayReminders();
+            document.getElementById('viewRemindersModal').style.display = 'block';
+        }
+
+        function closeModals() {
+            document.getElementById('reminderModal').style.display = 'none';
+            document.getElementById('viewRemindersModal').style.display = 'none';
+            
+            // Reset form
+            document.getElementById('reminderMedicine').value = '';
+            document.getElementById('reminderDosage').value = '';
+            document.getElementById('reminderTime').value = '';
+            document.getElementById('reminderFreq').value = 'once';
+        }
+
+        function saveReminder() {
+            const medicine = document.getElementById('reminderMedicine').value;
+            const dosage = document.getElementById('reminderDosage').value;
+            const time = document.getElementById('reminderTime').value;
+            const frequency = document.getElementById('reminderFreq').value;
+
+            if (!medicine || !time) {
+                showMessage('Please fill in medicine name and time', 'error');
+                return;
+            }
+
+            const reminder = {
+                id: Date.now(),
+                medicine: medicine,
+                dosage: dosage || '1 dose',
+                time: time,
+                frequency: frequency,
+                createdAt: new Date().toISOString()
+            };
+
+            reminders.push(reminder);
+            localStorage.setItem('medicineReminders', JSON.stringify(reminders));
+            
+            closeModals();
+            showMessage(`Reminder set for ${medicine} at ${time}`, 'success');
+            
+            // Set browser notification (if supported)
+            if ('Notification' in window) {
+                Notification.requestPermission();
+            }
+        }
+
+        function displayReminders() {
+            const remindersList = document.getElementById('remindersList');
+            
+            if (reminders.length === 0) {
+                remindersList.innerHTML = '<p style="text-align: center; color: #666; font-style: italic;">No reminders set yet</p>';
+                return;
+            }
+
+            let html = '';
+            reminders.forEach(reminder => {
+                html += `
+                    <div class="reminder-item">
+                        <div class="reminder-info">
+                            <div class="reminder-medicine">💊 ${reminder.medicine}</div>
+                            <div class="reminder-time">
+                                ⏰ ${reminder.time} - ${reminder.frequency} 
+                                ${reminder.dosage ? `(${reminder.dosage})` : ''}
+                            </div>
+                        </div>
+                        <div class="reminder-actions">
+                            <button onclick="deleteReminder(${reminder.id})" class="btn btn-danger btn-mini">Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            remindersList.innerHTML = html;
+        }
+
+        function deleteReminder(id) {
+            reminders = reminders.filter(reminder => reminder.id !== id);
+            localStorage.setItem('medicineReminders', JSON.stringify(reminders));
+            displayReminders();
+            showMessage('Reminder deleted', 'info');
+        }
+
+        function handleEmergencyCall() {
+            if (confirm('This will attempt to call emergency services. Continue?')) {
+                // In a real app, this would integrate with actual emergency services
+                // For now, we'll show instructions
+                showMessage('Emergency feature: In a real app, this would dial emergency services or your designated doctor. For now, please call your local emergency number manually.', 'info');
+                
+                // You could also open the phone dialer with a specific number
+                // window.location.href = 'tel:911'; // or your local emergency number
+            }
+        }
+
+        function speakMedicineInfo() {
+            if (!currentMedicineInfo) {
+                speak("No medicine information available to read.");
+                return;
+            }
+            
+            if (isSpeaking) {
+                speechSynthesis.cancel();
+                isSpeaking = false;
+                document.getElementById('speakBtn').classList.remove('speaking');
+                return;
+            }
+            
+            const textToSpeak = `
+                Medicine name: ${currentMedicineInfo.name}.
+                Uses: ${currentMedicineInfo.uses}.
+                Dosage: ${currentMedicineInfo.dosage}.
+                Side effects: ${currentMedicineInfo.sideEffects}.
+                Precautions: ${currentMedicineInfo.precautions}.
+            `;
+            
+            speak(textToSpeak);
+        }
+
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.8;
+                utterance.pitch = 1;
+                utterance.volume = 1;
+                
+                utterance.onstart = function() {
+                    isSpeaking = true;
+                    document.getElementById('speakBtn').classList.add('speaking');
+                };
+                
+                utterance.onend = function() {
+                    isSpeaking = false;
+                    document.getElementById('speakBtn').classList.remove('speaking');
+                };
+                
+                utterance.onerror = function() {
+                    isSpeaking = false;
+                    document.getElementById('speakBtn').classList.remove('speaking');
+                    showMessage('Speech synthesis error occurred.', 'error');
+                };
+                
+                speechSynthesis.speak(utterance);
+            } else {
+                showMessage('Speech synthesis not supported in this browser.', 'error');
+            }
+        }
+
+        function showLoading() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p id="loadingMessage">Processing image with OCR...</p>
+                </div>
+            `;
+        }
+
+        function updateLoadingMessage(message) {
+            const loadingMessage = document.getElementById('loadingMessage');
+            if (loadingMessage) {
+                loadingMessage.textContent = message;
+            }
+        }
+
+        function hideLoading() {
+            // Loading will be hidden when results are displayed
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 10px;
+                color: white;
+                font-weight: bold;
+                z-index: 9999;
+                max-width: 300px;
+                word-wrap: break-word;
+                animation: slideIn 0.5s ease-out;
+            `;
+            
+            switch(type) {
+                case 'success':
+                    messageDiv.style.background = 'linear-gradient(45deg, #56ab2f, #a8e6cf)';
+                    break;
+                case 'error':
+                    messageDiv.style.background = 'linear-gradient(45deg, #ff6b6b, #ee5a24)';
+                    break;
+                case 'info':
+                default:
+                    messageDiv.style.background = 'linear-gradient(45deg, #667eea, #764ba2)';
+                    break;
+            }
+            
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 5000);
+        }
+
+        // Add CSS animation for message slide-in
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Check for reminder notifications
+        function checkReminders() {
+            if (!('Notification' in window) || Notification.permission !== 'granted') {
+                return;
+            }
+
+            const now = new Date();
+            const currentTime = now.toTimeString().slice(0, 5);
+
+            reminders.forEach(reminder => {
+                if (reminder.time === currentTime) {
+                    new Notification(`💊 Medicine Reminder`, {
+                        body: `Time to take ${reminder.medicine} - ${reminder.dosage}`,
+                        icon: '💊'
+                    });
+                }
+            });
+        }
+
+        // Check reminders every minute
+        setInterval(checkReminders, 60000);
+    </script>
+</body>
+</html>

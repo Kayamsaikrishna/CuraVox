@@ -1,0 +1,209 @@
+# GitHub Actions CI/CD Pipeline for Medical AI Assistant
+name: Medical AI Assistant CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Test job for frontend
+  frontend-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: frontend_app/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd frontend_app
+        npm ci
+    
+    - name: Run linting
+      run: |
+        cd frontend_app
+        npm run lint || echo "Linting issues found"
+    
+    - name: Run tests
+      run: |
+        cd frontend_app
+        npm test
+    
+    - name: Run build
+      run: |
+        cd frontend_app
+        npm run build
+
+  # Test job for backend
+  backend-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: backend_api/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd backend_api
+        npm ci
+    
+    - name: Run linting
+      run: |
+        cd backend_api
+        npm run lint || echo "Linting issues found"
+    
+    - name: Run tests
+      run: |
+        cd backend_api
+        npm test
+    
+    - name: Security audit
+      run: |
+        cd backend_api
+        npm audit --audit-level moderate
+
+  # AI/ML Components test
+  ai-ml-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        cd ai_ml_engine
+        pip install -r requirements.txt
+    
+    - name: Run Python linting
+      run: |
+        cd ai_ml_engine
+        pip install flake8
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Run Python tests
+      run: |
+        cd ai_ml_engine
+        python -m pytest tests/ -v
+
+  # Security scan
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Run Snyk to check for vulnerabilities
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --file=backend_api/package.json
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Build and deploy to staging (only on main branch)
+  build-and-deploy-staging:
+    needs: [frontend-test, backend-test, ai-ml-test, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Login to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Build and push frontend
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: ./devops_qa/docker/Dockerfile.frontend
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/medical-ai-frontend:staging
+          ${{ secrets.DOCKER_USERNAME }}/medical-ai-frontend:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Build and push backend
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: ./devops_qa/docker/Dockerfile.backend
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/medical-ai-backend:staging
+          ${{ secrets.DOCKER_USERNAME }}/medical-ai-backend:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Deploy to production (manual trigger)
+  deploy-production:
+    needs: build-and-deploy-staging
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production..."
+        # Add production deployment commands here
+        # This would typically involve applying updated Kubernetes manifests
+        # or deploying to cloud platform (AWS, Azure, GCP)
+    
+    - name: Run post-deployment tests
+      run: |
+        echo "Running post-deployment tests..."
+        # Add post-deployment validation tests here
