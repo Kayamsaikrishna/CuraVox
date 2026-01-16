@@ -1,7 +1,7 @@
 # 🏥 Medical AI Assistant (Dr. CuraVox)
 
 <div align="center">
-  <img src="frontend_app/logo.jpeg" alt="CuraVox Logo" width="200" height="200" style="border-radius: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <img src="frontend_app/logo.jpeg" alt="CuraVox Logo" width="600" style="border-radius: 30px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); margin-bottom: 20px;" />
 </div>
 
 A comprehensive, voice-enabled Medical AI Assistant designed for accessibility. It uses a **Hybrid AI Architecture** (Google Gemini + Local LLaMA/Tesseract) to identify medicines from images, provide detailed clinical insights, and check for drug interactions.
