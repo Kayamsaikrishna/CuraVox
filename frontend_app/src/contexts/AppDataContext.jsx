@@ -3,58 +3,9 @@ import reminderService from '../services/reminderService';
 
 // Initial state
 const initialState = {
-  medicines: [
-    {
-      id: 1,
-      name: "Paracetamol",
-      activeIngredients: ["Paracetamol 500mg"],
-      dosage: "Take 1-2 tablets every 4-6 hours",
-      usage: "As needed for pain or fever. Do not exceed 8 tablets in 24 hours.",
-      sideEffects: ["Nausea", "Stomach pain", "Liver damage if taken in excess"],
-      expiryDate: "2025-12-31",
-      manufacturer: "Generic Pharmaceuticals",
-      warnings: ["Do not take with alcohol", "Consult doctor if symptoms persist"],
-      storage: "Store in a cool, dry place away from direct sunlight"
-    },
-    {
-      id: 2,
-      name: "Amoxicillin",
-      activeIngredients: ["Amoxicillin 250mg"],
-      dosage: "Take one capsule three times daily",
-      usage: "For bacterial infection. Complete full course even if feeling better.",
-      sideEffects: ["Diarrhea", "Nausea", "Skin rash"],
-      expiryDate: "2024-10-15",
-      manufacturer: "HealthPlus Labs",
-      warnings: ["Inform doctor about any allergies", "Do not stop early even if feeling better"],
-      storage: "Store at room temperature, protect from moisture"
-    },
-    {
-      id: 3,
-      name: "Ibuprofen",
-      activeIngredients: ["Ibuprofen 400mg"],
-      dosage: "Take 1 tablet every 6-8 hours",
-      usage: "For pain relief and inflammation. Take with food to avoid stomach upset.",
-      sideEffects: ["Stomach pain", "Heartburn", "Dizziness"],
-      expiryDate: "2025-05-20",
-      manufacturer: "Wellness Pharma",
-      warnings: ["Do not take on empty stomach", "Avoid if you have stomach ulcers"],
-      storage: "Store in a cool, dry place"
-    }
-  ],
+  medicines: [],
   reminders: [],
-  profile: {
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 (555) 123-4567',
-    emergencyContact: '+1 (555) 987-6543',
-    emergencyContactName: 'Jane Doe',
-    address: '123 Main Street, Anytown, ST 12345',
-    dateOfBirth: '1980-01-01',
-    bloodType: 'O+',
-    medicalConditions: 'Hypertension, Diabetes',
-    allergies: 'Penicillin',
-    medications: 'Metformin, Lisinopril'
-  },
+  profile: null,
   loading: {
     medicines: false,
     reminders: false,

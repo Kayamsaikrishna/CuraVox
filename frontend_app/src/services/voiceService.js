@@ -5,7 +5,8 @@ class VoiceService {
     this.recognition = null;
     this.synthesis = window.speechSynthesis;
     this.isListening = false;
-    this.shouldBeListening = false; // Intention flag
+    this.shouldBeListening = false;
+    this.isWakeWordActive = false; // Starts in Passive Mode
     this.commands = new Map();
     this.commandHistory = [];
     this.initializeVoiceRecognition();
@@ -112,26 +113,43 @@ class VoiceService {
   }
 
   async processCommand(command) {
-    console.log('Processing voice command:', command);
-    this.addToHistory(command);
-
-    // 1. Check for simple local navigation commands (for speed)
     const lowerCommand = command.toLowerCase();
 
-    // Quick local overrides for specific UI actions that don't need AI
-    if (lowerCommand.includes('stop') && lowerCommand.includes('listen')) {
-      this.stopListening();
+    // 1. Check for WAKE WORD (Easier options)
+    const wakeWords = ['doctor', 'assistant', 'hello', 'hi', 'start', 'wake up', 'curavox'];
+    const isWakeWord = wakeWords.some(word => lowerCommand.includes(word));
+
+    if (isWakeWord) {
+      this.isWakeWordActive = true;
+      this.speak("I'm listening."); // Shorter, simpler response
+      window.dispatchEvent(new CustomEvent('voiceStateChange', { detail: { isListening: true, isActive: true } }));
       return;
     }
 
-    // 2. If it's a complex query or not a simple nav, ASK THE AI BRAIN
-    try {
-      this.speak("Thinking..."); // Feedback that we are processing
+    // 2. Check for STOP WORD ("Stop")
+    if (lowerCommand === 'stop' || lowerCommand.includes('stop listening') || lowerCommand.includes('shut up') || lowerCommand.includes('quiet')) {
+      if (this.isWakeWordActive) {
+        this.isWakeWordActive = false;
+        this.speak("Standing by.");
+        window.dispatchEvent(new CustomEvent('voiceStateChange', { detail: { isListening: true, isActive: false } }));
+      }
+      return;
+    }
 
+    // 3. If NOT active, ignore everything else (Passive Mode)
+    if (!this.isWakeWordActive) {
+      console.log('Ignored (Standby):', command);
+      return;
+    }
+
+    // --- ACTIVE PROCESSING BELOW ---
+    console.log('Processing active command:', command);
+    this.addToHistory(command);
+
+    try {
       // Send to Backend API
       const response = await api.post('/ai/command', {
         command: command,
-        // Assuming we have a userId stored or context, otherwise generic
         userId: 'user-123'
       });
 
@@ -142,7 +160,7 @@ class VoiceService {
         this.speak(result.response);
       }
 
-      // Perform any actions the AI decided on (e.g., "navigate_to_scan")
+      // Perform any actions
       if (result.action) {
         this.handleAIAction(result.action, result.data);
       }
@@ -160,7 +178,7 @@ class VoiceService {
         return;
       }
 
-      // Fallback to local if AI fails or for offline support
+      // Fallback
       this.processLocalFallback(command);
     }
   }

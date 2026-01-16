@@ -46,26 +46,15 @@ const App = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const [showSplash, setShowSplash] = React.useState(() => {
-    // Only show splash if it hasn't been shown in this session
-    return !sessionStorage.getItem('splashShown');
-  });
-
-  const handleSplashComplete = () => {
-    sessionStorage.setItem('splashShown', 'true');
-    setShowSplash(false);
-    VoiceService.getInstance().startListening();
-  };
-
-  // If splash was already shown, ensure voice is listening on mount
-  useEffect(() => {
-    if (!showSplash) {
-      VoiceService.getInstance().startListening();
-    }
-  }, [showSplash]);
+  // Show splash screen on every refresh/mount as requested
+  const [showSplash, setShowSplash] = React.useState(true);
 
   if (showSplash) {
-    return <SplashScreen onComplete={handleSplashComplete} />;
+    return <SplashScreen onComplete={() => {
+      setShowSplash(false);
+      // Start listening after splash
+      VoiceService.getInstance().startListening();
+    }} />;
   }
 
   return (
