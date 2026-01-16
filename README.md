@@ -1,10 +1,14 @@
 # 🏥 Medical AI Assistant (Dr. CuraVox)
 
+<div align="center">
+  <img src="frontend_app/logo.jpeg" alt="CuraVox Logo" width="200" height="200" style="border-radius: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+</div>
+
 A comprehensive, voice-enabled Medical AI Assistant designed for accessibility. It uses a **Hybrid AI Architecture** (Google Gemini + Local LLaMA/Tesseract) to identify medicines from images, provide detailed clinical insights, and check for drug interactions.
 
 ---
 
-## � Features
+## 🚀 Features
 
 *   **Hybrid AI Brain**:
     *   **Dr. CuraVox (Gemini 2.5 Flash)**: Primary cloud intelligence for instant, accurate medicine analysis.
@@ -21,12 +25,39 @@ Ensure you have the following installed:
 
 1.  **Node.js** (v18 or higher)
 2.  **Python** (v3.9 or higher)
-3.  **MongoDB** (Local or Atlas)
-4.  **Tesseract OCR** (System-level installation recommended for local fallback)
+3.  **MongoDB Community Server** (Local Database)
+4.  **MongoDB Compass** (Database UI)
+5.  **Tesseract OCR** (System-level installation recommended for local fallback)
 
 ---
 
-## � Installation & Setup
+## 💾 Database Setup (MongoDB)
+
+This application uses a local MongoDB database. Follow these steps to set it up:
+
+### 1. Install MongoDB server
+1.  Download **MongoDB Community Server** from [mongodb.com/try/download/community](https://www.mongodb.com/try/download/community).
+2.  Run the installer. **Important**: Select "Install MongoD as a Service".
+3.  Finish installation.
+
+### 2. Install MongoDB Compass (GUI)
+1.  Download **MongoDB Compass** from [mongodb.com/try/download/compass](https://www.mongodb.com/try/download/compass).
+2.  Install and open the application.
+
+### 3. Connect to Database
+1.  Open MongoDB Compass.
+2.  In the URI field, enter: `mongodb://localhost:27017`
+3.  Click **Connect**.
+4.  You don't need to create the database manually; the application will automatically create a database named `medical_ai` when you first run it.
+5.  **Verified Connection String**:
+    ```env
+    MONGODB_URI=mongodb://localhost:27017/medical_ai
+    ```
+    (Ensure this matches your `.env` file in `backend_api/`).
+
+---
+
+## 📦 Installation & Setup
 
 ### 1. Clone Repository
 ```bash
@@ -87,7 +118,7 @@ This project uses **Google Gemini** for high-accuracy analysis.
 
 ---
 
-## � Full Dependency List
+## 📚 Full Dependency List
 
 ### 🟢 Backend (NPM)
 | Package | Purpose |
@@ -131,7 +162,7 @@ This project uses **Google Gemini** for high-accuracy analysis.
 
 ## 🏃‍♂️ Running the Application
 
-1.  **Start Database**: Ensure MongoDB is running.
+1.  **Start Database**: Ensure MongoDB is running via Services or Compass.
 2.  **Start Backend**:
     ```bash
     cd backend_api
