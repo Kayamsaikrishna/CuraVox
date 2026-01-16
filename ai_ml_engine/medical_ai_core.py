@@ -23,6 +23,7 @@ import argparse
 from transformers import pipeline, logging as hf_logging
 import torch
 import warnings
+import asyncio # Fix missing import
 
 # Configure HF Logging - Set to ERROR to hide massive config JSON dumps now that it works
 hf_logging.set_verbosity_error()
@@ -138,8 +139,12 @@ class MedicalAICore:
                     "response": self.analyze_medicine_from_text(medicine_entity).basic_summary()
                 }
             else:
-                 # Fallback to LLM if no entity found
-                 pass
+                 # Fallback to LLM if no entity found but intent matches medicine
+                 advice = self.get_medical_advice(command)
+                 return {
+                     "action": "chat",
+                     "response": advice
+                 }
 
         # --- Intent 2: Symptom Checking ---
         if any(w in command_lower for w in ['pain', 'hurt', 'feel', 'symptom', 'headache', 'dizzy']):
@@ -670,7 +675,10 @@ def main():
         }
     
     # Output result as JSON
+    # Output result as JSON
     print(json.dumps(output), flush=True)
+    sys.stdout.flush()  # Extra insurance
+    # logger.info("Python script finished. Output sent.") # Debug log (stderr)
 
 if __name__ == "__main__":
     main()

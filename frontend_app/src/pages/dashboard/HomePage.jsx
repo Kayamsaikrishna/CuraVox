@@ -51,7 +51,7 @@ const HomePage = () => {
     // Use a small timeout to ensure voice service is ready
     setTimeout(() => {
       setAnnouncedText(welcomeMessage);
-      speak(welcomeMessage);
+      // speak(welcomeMessage); // Silenced as requested for cleaner refresh experience
     }, 1000);
 
   }, []); // Run ONLY once on mount

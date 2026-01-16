@@ -14,7 +14,12 @@ A comprehensive, voice-enabled Medical AI Assistant designed for accessibility. 
     *   **Dr. CuraVox (Gemini 2.5 Flash)**: Primary cloud intelligence for instant, accurate medicine analysis.
     *   **Local Engine (Python)**: Privacy-focused backup using OCR and LLaMA models.
 *   **Visual Recognition**: Instantly identifies pills, strips, and syrups via camera or upload.
-*   **Voice-First UI**: Fully accessible interface that reads out all results (ideal for visually impaired users).
+*   **Smart Voice Control**:
+    *   **Wake Words**: Activates on "Doctor", "Hello", "Assistant", or "Start".
+    *   **Hands-Free**: Continuous listening with "Stop" command for standby mode.
+*   **Premium Experience**:
+    *   **Video Splash Screen**: Cinematic product reveal intro (`Product_Reveal_Video_Generation.mp4`).
+    *   **Accessible UI**: High-contrast, voice-guided interface.
 *   **Safety Checks**: Automatic interaction checking and "Red Flag" safety warnings.
 
 ---

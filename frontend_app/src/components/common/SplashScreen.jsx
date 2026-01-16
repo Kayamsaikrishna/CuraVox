@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { AnimatePresence, motion } from 'framer-motion';
-// Import the video file
 import introVideo from '../../assets/Product_Reveal_Video_Generation.mp4';
+// import { FaVolumeMute, FaVolumeUp } from 'react-icons/fa'; // Optional icons
 
 const SplashContainer = styled(motion.div)`
   position: fixed;
@@ -28,33 +28,51 @@ const SplashScreen = ({ onComplete }) => {
     const videoRef = useRef(null);
 
     useEffect(() => {
-        // Safety timeout: If video fails or stalls, exit after 8 seconds (video duration + buffer)
-        const safetyTimer = setTimeout(() => {
-            onComplete(); // Force exit if video doesn't end properly
-        }, 8000);
+        const playVideo = async () => {
+            if (!videoRef.current) return;
 
-        return () => clearTimeout(safetyTimer);
+            try {
+                // Attempt 1: Play with sound
+                videoRef.current.muted = false;
+                await videoRef.current.play();
+                console.log("Autoplay with sound success");
+            } catch (err) {
+                console.warn("Autoplay with sound blocked. Falling back to muted.");
+                // Attempt 2: Fallback to muted (Always works)
+                if (videoRef.current) {
+                    videoRef.current.muted = true;
+                    try {
+                        await videoRef.current.play();
+                    } catch (e) {
+                        console.error("Muted playback failed too", e);
+                        onComplete(); // Force exit if video is totally broken
+                    }
+                }
+            }
+        };
+
+        playVideo();
+
+        // Safety timeout: 10 seconds max (Video duration + buffer)
+        const timer = setTimeout(() => {
+            onComplete();
+        }, 10000);
+
+        return () => clearTimeout(timer);
     }, [onComplete]);
-
-    const handleVideoEnd = () => {
-        onComplete();
-    };
 
     return (
         <AnimatePresence>
             <SplashContainer
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                initial={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: 1 }}
             >
                 <VideoElement
                     ref={videoRef}
                     src={introVideo}
-                    autoPlay
-                    muted
                     playsInline
-                    onEnded={handleVideoEnd}
+                    onEnded={onComplete}
                 />
             </SplashContainer>
         </AnimatePresence>

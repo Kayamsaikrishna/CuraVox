@@ -138,21 +138,16 @@ class AdvancedMedicalAI {
   }
 
   async checkInteractions(userId, medicine1, medicine2) {
+    // REQ: Use Local AI for text interactions (Gemini reserved for Scan/Upload)
+    /* 
     const geminiService = require('./geminiService');
     if (geminiService.model) {
       console.log("⚡ Checking interactions with Gemini...");
-      const result = await geminiService.analyzeInteractions([medicine1, medicine2]);
-      if (result) {
-        return {
-          interactionExists: result.interactionExists,
-          description: result.description,
-          recommendation: result.recommendation
-        };
-      }
+      // ...
     }
+    */
 
-    // FALLBACK
-    console.log("⚠️ Gemini failed/unavailable. Falling back to Local AI...");
+    console.log("⚡ Checking interactions with Local AI (Agents)...");
     try {
       const query = `Check for interactions between ${medicine1} and ${medicine2}`;
       const result = await this.callPythonEngine('get_medical_advice', {
@@ -174,22 +169,15 @@ class AdvancedMedicalAI {
   }
 
   async analyzeSymptoms(userId, symptoms, duration) {
+    // REQ: Use Local AI for symptoms (Gemini reserved for Scan/Upload)
+    /*
     const geminiService = require('./geminiService');
     if (geminiService.model) {
-      console.log("⚡ Analyzing symptoms with Gemini...");
-      const result = await geminiService.analyzeSymptoms(symptoms, { userId, duration });
-      if (result) {
-        return {
-          symptoms: result.symptoms,
-          possibleConditions: result.differential_diagnoses,
-          recommendedActions: result.treatment_recommendations,
-          urgency: result.urgency_level,
-          confidence: result.confidence_score
-        };
-      }
+        // ...
     }
+    */
 
-    console.log("⚠️ Gemini failed/unavailable. Falling back to Local AI...");
+    console.log("⚡ Analyzing symptoms with Local AI (Agents)...");
     try {
       const result = await this.callPythonEngine('analyze_patient_case', {
         symptoms: symptoms,
@@ -213,23 +201,17 @@ class AdvancedMedicalAI {
   }
 
   async processComplexQuery(userId, command) {
+    // REQ: Use Local AI for General Voice (Gemini reserved for Scan/Upload)
+    /*
     const geminiService = require('./geminiService');
     if (geminiService.model) {
-      // Simple heuristic: Is this a medical question?
-      console.log("⚡ Processing Voice Command with Gemini...");
-      const response = await geminiService.chat(command);
-      if (response) {
-        return {
-          response: response,
-          action: 'voice_reply',
-          original_query: command,
-          data: {}
-        };
-      }
+       // ...
     }
+    */
 
-    // Fallback
+    // Fallback -> NOW PRIMARY
     try {
+      console.log("⚡ Processing Voice Command with Local AI (Agents)...");
       // Use the Unified Voice Processor in Python
       const result = await this.callPythonEngine('process_voice_command', {
         command: command,
@@ -242,7 +224,7 @@ class AdvancedMedicalAI {
         data: result
       };
     } catch (e) {
-      return { response: "I'm having trouble connecting.", action: 'error' };
+      return { response: "I'm having trouble connecting to my local brain.", action: 'error' };
     }
   }
 

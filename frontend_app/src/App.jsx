@@ -9,21 +9,19 @@ import SettingsPage from './pages/settings/SettingsPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import ScanPage from './pages/scan/ScanPage';
 import NotFoundPage from './pages/NotFoundPage';
-import VoiceControlWidget from './components/common/VoiceControlWidget';
+// import VoiceControlWidget from './components/common/VoiceControlWidget'; // Removed as requested
 import VoiceService from './services/voiceService';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import { AuthProvider } from './contexts/AuthContext';
 import PrivateRoute from './components/common/PrivateRoute';
 import SplashScreen from './components/common/SplashScreen';
+import RouteAnnouncer from './components/common/RouteAnnouncer';
 
 const App = () => {
   const voiceService = VoiceService.getInstance();
 
   useEffect(() => {
-    // Initialize voice service
-    // console.log('Voice service initialized');
-
     // Add keyboard shortcuts
     const handleKeyDown = (event) => {
       // Spacebar to toggle listening
@@ -46,13 +44,23 @@ const App = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Show splash screen on every refresh/mount as requested
-  const [showSplash, setShowSplash] = React.useState(true);
+  // Show splash screen only ONCE per session (restart browser to reset)
+  const [showSplash, setShowSplash] = React.useState(() => {
+    return !sessionStorage.getItem('splashShown');
+  });
+
+  // Ensure voice is listening if splash is skipped
+  useEffect(() => {
+    if (!showSplash) {
+      VoiceService.getInstance().startListening();
+    }
+  }, [showSplash]);
 
   if (showSplash) {
     return <SplashScreen onComplete={() => {
+      sessionStorage.setItem('splashShown', 'true');
       setShowSplash(false);
-      // Start listening after splash
+      // Start listening after splash logic
       VoiceService.getInstance().startListening();
     }} />;
   }
@@ -60,6 +68,7 @@ const App = () => {
   return (
     <ErrorBoundary>
       <AuthProvider>
+        <RouteAnnouncer />
         <div className="min-h-screen bg-blue-50">
           <Routes>
             {/* Public Routes */}
@@ -103,15 +112,14 @@ const App = () => {
               </PrivateRoute>
             } />
 
-            {/* Redirect root to home (which will redirect to login if needed) */}
+            {/* Redirect root to home */}
             <Route path="/" element={<Navigate to="/home" replace />} />
 
             {/* 404 */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
 
-          {/* Global Voice Control Widget */}
-          <VoiceControlWidget />
+          {/* VoiceControlWidget Removed */}
         </div>
       </AuthProvider>
     </ErrorBoundary>

@@ -146,13 +146,22 @@ class VoiceService {
     console.log('Processing active command:', command);
     this.addToHistory(command);
 
+    // 4. Check LOCAL COMMANDS first (Navigation, Help, simple stuff)
+    // This makes navigation instant and works even if backend is slow/offline
+    if (this.commands.has(lowerCommand)) {
+      console.log("Executing local command:", lowerCommand);
+      this.commands.get(lowerCommand)();
+      return;
+    }
+
+    // 5. If not local, send to Local AI Backend (Complex queries)
     try {
       // Send to Backend API
       const response = await api.post('/ai/command', {
         command: command,
         userId: 'user-123'
       });
-
+      // ... (rest of API handling)
       const result = response.data;
 
       // Speak the AI's natural response
@@ -164,8 +173,8 @@ class VoiceService {
       if (result.action) {
         this.handleAIAction(result.action, result.data);
       }
-
     } catch (error) {
+      // ... (error handling)
       console.error("AI processing error:", error);
 
       if (error.response && error.response.status === 401) {
@@ -178,7 +187,8 @@ class VoiceService {
         return;
       }
 
-      // Fallback
+      // Fallback logic not really needed if we checked local commands first, 
+      // but good safety net for partial matches
       this.processLocalFallback(command);
     }
   }
@@ -354,14 +364,8 @@ class VoiceService {
   }
 
   provideHelp() {
-    const helpText = `
-      Available commands:
-      Navigation: Say "Go to home", "Go to medicines", "Go to scan"
-      Scanning: Say "Start scanning", "Capture image", "Upload image"
-      Medicine info: Say "Tell me about [medicine]", "Side effects of [medicine]"
-      General: Say "Help", "Repeat", "History", "Stop listening", "Exit"
-    `;
-    this.speak(helpText);
+    // Doctor-like natural response
+    this.speak("I am Dr. CuraVox, your medical assistant. You can ask me to navigate, scan medicines, or answer health questions. How can I help you today?");
   }
 
   repeatLast() {
