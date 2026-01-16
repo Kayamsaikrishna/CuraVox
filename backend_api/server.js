@@ -1,3 +1,5 @@
+const dotenv = require('dotenv');
+dotenv.config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -21,7 +23,7 @@ const connectDB = async () => {
   try {
     // Connect to MongoDB
     mongoose
-      .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/soniris')
+      .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/medical_ai')
       .then(async () => {
         console.log('MongoDB connected');
         // Run AI Health Check

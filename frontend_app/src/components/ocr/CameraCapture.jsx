@@ -46,10 +46,17 @@ const CameraCapture = ({ onCapture, isLoading }) => {
     getVideoDevices();
   }, []);
 
+  const mediaStreamRef = useRef(null); // Dedicated ref for stream management
+
   useEffect(() => {
     const initCamera = async () => {
       if (!selectedDevice) return;
       try {
+        // Stop any existing stream first
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach(t => t.stop());
+        }
+
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             deviceId: { exact: selectedDevice },
@@ -58,15 +65,20 @@ const CameraCapture = ({ onCapture, isLoading }) => {
             facingMode: 'environment' // Prefer back camera
           }
         });
+
+        // Store in dedicated ref
+        mediaStreamRef.current = stream;
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          setHasPermission(true);
-          setError(null);
-          // Announce camera ready with a slight delay to ensure TTS is ready
-          setTimeout(() => {
-            speak("Camera active. I will guide you. Smart capture is on.");
-          }, 500);
         }
+
+        setHasPermission(true);
+        setError(null);
+        // Announce camera ready with a slight delay to ensure TTS is ready
+        setTimeout(() => {
+          speak("Camera active. I will guide you. Smart capture is on.");
+        }, 500);
       } catch (err) {
         setError(`Camera error: ${err.message}`);
         setHasPermission(false);
@@ -74,9 +86,17 @@ const CameraCapture = ({ onCapture, isLoading }) => {
       }
     };
     initCamera();
+
+    // Reliable cleanup
     return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => {
+          track.stop();
+        });
+        mediaStreamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
       }
     };
   }, [selectedDevice]); // Removed speak from dependency to avoid loop
@@ -143,6 +163,17 @@ const CameraCapture = ({ onCapture, isLoading }) => {
       // Store current frame copy for next comparison
       lastFrameData.current = new Uint8ClampedArray(data);
 
+      // -- Metric 3: Edge Density (Text/Detail Detection) --
+      let edgeScore = 0;
+      for (let i = 0; i < data.length - 4; i += 4) {
+        const current = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const next = (data[i + 4] + data[i + 5] + data[i + 6]) / 3;
+        edgeScore += Math.abs(current - next);
+      }
+      edgeScore = edgeScore / (data.length / 4);
+
+      const TEXT_DETAIL_THRESHOLD = 20;
+
       // -- Guidance Logic --
       if (avgBrightness < BRIGHTNESS_THRESHOLD) {
         const msg = "Too dark. Turn on a light.";
@@ -156,6 +187,13 @@ const CameraCapture = ({ onCapture, isLoading }) => {
         if (guidance !== msg) {
           setGuidance(msg);
           speak(msg); // Only speak occasionally?
+        }
+        stabilityCounter.current = 0;
+      } else if (edgeScore < TEXT_DETAIL_THRESHOLD) {
+        const msg = "Show medicine label.";
+        if (guidance !== msg) {
+          setGuidance(msg);
+          speak(msg);
         }
         stabilityCounter.current = 0;
       } else {

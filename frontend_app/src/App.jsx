@@ -11,14 +11,18 @@ import ScanPage from './pages/scan/ScanPage';
 import NotFoundPage from './pages/NotFoundPage';
 import VoiceControlWidget from './components/common/VoiceControlWidget';
 import VoiceService from './services/voiceService';
+import LoginPage from './pages/auth/LoginPage';
+import RegisterPage from './pages/auth/RegisterPage';
+import { AuthProvider } from './contexts/AuthContext';
+import PrivateRoute from './components/common/PrivateRoute';
 
 const App = () => {
   const voiceService = VoiceService.getInstance();
 
   useEffect(() => {
     // Initialize voice service
-    console.log('Voice service initialized');
-    
+    // console.log('Voice service initialized');
+
     // Add keyboard shortcuts
     const handleKeyDown = (event) => {
       // Spacebar to toggle listening
@@ -27,7 +31,7 @@ const App = () => {
         voiceService.toggleListening();
       }
       // H for help
-      else if (event.key.toLowerCase() === 'h') {
+      else if (event.key && event.key.toLowerCase() === 'h') {
         event.preventDefault();
         voiceService.provideHelp();
       }
@@ -39,22 +43,61 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-blue-50">
-        <Routes>
-          <Route path="/" element={<Navigate to="/home" replace />} />
-          <Route path="/home" element={<HomePage />} />
-          <Route path="/medicines" element={<MedicineListPage />} />
-          <Route path="/medicines/:id" element={<MedicineDetailPage />} />
-          <Route path="/reminders" element={<RemindersPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/scan" element={<ScanPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-        
-        {/* Global Voice Control Widget */}
-        <VoiceControlWidget />
-      </div>
+      <AuthProvider>
+        <div className="min-h-screen bg-blue-50">
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+
+            {/* Protected Routes */}
+            <Route path="/home" element={
+              <PrivateRoute>
+                <HomePage />
+              </PrivateRoute>
+            } />
+            <Route path="/medicines" element={
+              <PrivateRoute>
+                <MedicineListPage />
+              </PrivateRoute>
+            } />
+            <Route path="/medicines/:id" element={
+              <PrivateRoute>
+                <MedicineDetailPage />
+              </PrivateRoute>
+            } />
+            <Route path="/reminders" element={
+              <PrivateRoute>
+                <RemindersPage />
+              </PrivateRoute>
+            } />
+            <Route path="/settings" element={
+              <PrivateRoute>
+                <SettingsPage />
+              </PrivateRoute>
+            } />
+            <Route path="/profile" element={
+              <PrivateRoute>
+                <ProfilePage />
+              </PrivateRoute>
+            } />
+            <Route path="/scan" element={
+              <PrivateRoute>
+                <ScanPage />
+              </PrivateRoute>
+            } />
+
+            {/* Redirect root to home (which will redirect to login if needed) */}
+            <Route path="/" element={<Navigate to="/home" replace />} />
+
+            {/* 404 */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+
+          {/* Global Voice Control Widget */}
+          <VoiceControlWidget />
+        </div>
+      </AuthProvider>
     </ErrorBoundary>
   );
 };

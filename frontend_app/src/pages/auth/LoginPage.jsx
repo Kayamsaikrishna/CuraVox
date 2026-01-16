@@ -1,16 +1,29 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    username: '',
+    email: '', // Changed to email if backend expects email, or keep username
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login, isAuthenticated } = useAuth();
+
+  // Get redirect path or default to home
+  const from = location.state?.from?.pathname || '/home';
+
+  // Redirect if already logged in
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/home', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -22,19 +35,41 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Submitting login form:', formData);
     setIsLoading(true);
 
     try {
-      // Simulate API call - in a real app, this would call your backend API
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock authentication success
-      toast.success('Login successful!');
-      
-      // Redirect to home page
-      navigate('/');
+      const result = await login(formData.email, formData.password); // Assuming backend takes email/password
+
+      if (result.success) {
+        toast.success('Login successful!');
+        // Speak success
+        try {
+          // Import dynamically or assume it's available via context/global if not imported.
+          // Since we can't easily add imports without messing up top of file, let's use the one from props or just use window.speechSynthesis directly as fallback or if possible get it from context.
+          // Wait, App.jsx initializes it but doesn't provide it via Context.
+          // Let's rely on simple window.speechSynthesis for now as a quick fix or try to import VoiceService if possible.
+          // Better: Use VoiceService.
+          const { default: VoiceService } = await import('../../services/voiceService');
+          VoiceService.getInstance().speak('Login successful. Redirecting to home.');
+        } catch (e) { console.log('Voice feedback failed', e); }
+
+        navigate(from, { replace: true });
+      } else {
+        const msg = result.message || 'Login failed.';
+        toast.error(msg);
+        try {
+          const { default: VoiceService } = await import('../../services/voiceService');
+          VoiceService.getInstance().speak(msg);
+        } catch (e) { console.log('Voice error feedback failed', e); }
+      }
     } catch (error) {
-      toast.error('Login failed. Please check your credentials.');
+      const msg = 'An unexpected error occurred.';
+      toast.error(msg);
+      try {
+        const { default: VoiceService } = await import('../../services/voiceService');
+        VoiceService.getInstance().speak(msg);
+      } catch (e) { }
     } finally {
       setIsLoading(false);
     }
@@ -54,20 +89,20 @@ const LoginPage = () => {
             </Link>
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="username" className="sr-only">Username</label>
+              <label htmlFor="email" className="sr-only">Email / Username</label>
               <input
-                id="username"
-                name="username"
+                id="email"
+                name="email"
                 type="text"
                 required
-                value={formData.username}
+                value={formData.email}
                 onChange={handleInputChange}
                 className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white dark:bg-gray-700"
-                placeholder="Username"
+                placeholder="Email or Username"
               />
             </div>
             <div className="relative">
@@ -138,12 +173,11 @@ const LoginPage = () => {
             </button>
           </div>
         </form>
-        
+
         <div className="mt-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Demo Account</h3>
+          <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Demo Info</h3>
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            Username: <span className="font-mono bg-gray-200 dark:bg-gray-600 px-1 rounded">demo</span><br />
-            Password: <span className="font-mono bg-gray-200 dark:bg-gray-600 px-1 rounded">demo123</span>
+            (If no account, use Register to create one)
           </p>
         </div>
       </div>

@@ -117,12 +117,12 @@ const ocrResultSchema = new mongoose.Schema({
 
 // Indexes for efficient querying
 ocrResultSchema.index({ userId: 1, createdAt: -1 }); // For user's recent scans
-ocrResultSchema.index({ medicineName: 1 }); // For medicine-based queries
+// ocrResultSchema.index({ medicineName: 1 }); // Removed duplicate index
 ocrResultSchema.index({ confidenceScore: -1 }); // For sorting by confidence
 ocrResultSchema.index({ createdAt: -1 }); // For chronological ordering
 
 // Virtual for formatted date
-ocrResultSchema.virtual('formattedDate').get(function() {
+ocrResultSchema.virtual('formattedDate').get(function () {
   return this.createdAt.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -133,7 +133,7 @@ ocrResultSchema.virtual('formattedDate').get(function() {
 });
 
 // Static method to get user's scan history
-ocrResultSchema.statics.getUserScans = function(userId, limit = 10, skip = 0) {
+ocrResultSchema.statics.getUserScans = function (userId, limit = 10, skip = 0) {
   return this.find({ userId })
     .populate('matchedMedicine', 'name brandName strength')
     .sort({ createdAt: -1 })
@@ -142,22 +142,22 @@ ocrResultSchema.statics.getUserScans = function(userId, limit = 10, skip = 0) {
 };
 
 // Static method to get scans by medicine name
-ocrResultSchema.statics.getByMedicineName = function(medicineName, limit = 10) {
-  return this.find({ 
-    medicineName: { $regex: medicineName, $options: 'i' } 
+ocrResultSchema.statics.getByMedicineName = function (medicineName, limit = 10) {
+  return this.find({
+    medicineName: { $regex: medicineName, $options: 'i' }
   })
-  .populate('userId', 'firstName lastName email')
-  .sort({ createdAt: -1 })
-  .limit(limit);
+    .populate('userId', 'firstName lastName email')
+    .sort({ createdAt: -1 })
+    .limit(limit);
 };
 
 // Static method to get scans with low confidence
-ocrResultSchema.statics.getLowConfidenceScans = function(threshold = 70) {
-  return this.find({ 
-    confidenceScore: { $lt: threshold } 
+ocrResultSchema.statics.getLowConfidenceScans = function (threshold = 70) {
+  return this.find({
+    confidenceScore: { $lt: threshold }
   })
-  .populate('userId', 'firstName lastName email')
-  .sort({ confidenceScore: 1 });
+    .populate('userId', 'firstName lastName email')
+    .sort({ confidenceScore: 1 });
 };
 
 const OcrResult = mongoose.model('OcrResult', ocrResultSchema);

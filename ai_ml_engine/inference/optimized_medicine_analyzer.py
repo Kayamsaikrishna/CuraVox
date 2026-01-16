@@ -268,10 +268,25 @@ class OptimizedMedicineAnalyzer:
         """
         text_lower = text.lower()
         
-        # First, try to find known medicine names from our knowledge base
-        for known_medicine in self.medical_knowledge_base.keys():
+        # First, try to find known medicine names from our knowledge base (Exact + Fuzzy Match)
+        import difflib
+        known_medicines = list(self.medical_knowledge_base.keys())
+        
+        # 1. Check for exact containment
+        for known_medicine in known_medicines:
             if known_medicine in text_lower:
                 return known_medicine.capitalize()
+                
+        # 2. Check for Fuzzy Match (crucial for OCR errors like "_amiettormin" -> "metformin")
+        # Split text into word tokens to check against knowledge base
+        tokens = re.findall(r'\b\w+\b', text_lower)
+        for token in tokens:
+            if len(token) < 4: continue # Skip short words
+            # Get close matches (cutoff=0.8 means 80% similarity required)
+            matches = difflib.get_close_matches(token, known_medicines, n=1, cutoff=0.75)
+            if matches:
+                print(f"[Fuzzy Match] Corrected '{token}' to '{matches[0]}'") # Debug log
+                return matches[0].capitalize()
         
         # If not found in knowledge base, use regex patterns
         for pattern in self.patterns['medicine_name']:

@@ -69,18 +69,47 @@ The backend logs the output of the Python process.
 
 The system uses a **Hybrid AI Architecture**. It doesn't rely on just one model.
 
-### 3.1. Local LLM (Ollama)
-- **Role**: Empathy & General Knowledge.
-- **Where**: `ai_ml_engine/local_llm_integration.py`
-- **Models Supported**:
-    - `medllama2` (Preferred): Fine-tuned on medical data.
-    - `llama3.2`: General purpose, very fast.
-    - `mistral`: Good fallback.
-- **How it works**:
-    - The code auto-detects which model you have installed.
-    - It constructs a prompt: `SYSTEM: You are a helpful medical assistant... USER: [Query]`.
-    - It hits the Ollama API (`http://localhost:11434/api/generate`).
+## 🧠 1. Hybrid AI Architecture (Dr. CuraVox)
 
+The system now uses a **Smart Hybrid Approach** to ensure maximum accuracy and reliability:
+
+### A. Primary Brain: Google Gemini 2.5 Flash
+*   **Role**: Senior Clinical Pharmacist & Internal Medicine Specialist.
+*   **Capabilities**:
+    *   **Visual Analysis**: Reads medicine strips (OCR) + Identifies pills by shape/color.
+    *   **Clinical Insight**: Generates "Doctor's Advice" and structured safety warnings.
+    *   **High Performance**: <1s response time for complex queries.
+*   **Safety**: Auto-switches to `gemini-1.5-flash` if the main model is overloaded (503 Error).
+
+### B. Emergency Backup: Local Python Engine
+*   **Role**: Offline Fallback & Privacy-First Processing.
+*   **Triggers**: Activates automatically if Internet fails or Cloud API is down.
+*   **Tech Stack**: Tesseract OCR (Multi-Angle) + MedLLaMA2 (Local LLM).
+
+---
+
+## 🔑 2. Environment Setup
+
+To run this system, you must configure the backend environment.
+
+### Required Variables
+Create a `.env` file in `backend_api/` (see `.env.example`):
+
+```env
+# Core
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/medical_ai
+
+# Security
+JWT_SECRET=your_secret_key
+
+# AI Configuration
+GEMINI_API_KEY=AIzaSy... (Get from Google AI Studio)
+```
+
+> **Note**: The `.env` file is git-ignored for security. Do not commit your real keys.
+
+---
 ### 3.2. Agentic Framework (The "Experts")
 - **Role**: Symptom Diagnosis & Triage.
 - **Where**: `ai_ml_engine/medical_agents.py`

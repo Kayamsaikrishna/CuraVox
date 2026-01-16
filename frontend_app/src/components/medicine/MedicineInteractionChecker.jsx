@@ -1,72 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import useAccessibility from '../../hooks/useAccessibility';
+import { useMedicineStore } from '../../stores/medicineStore';
 
 const MedicineInteractionChecker = () => {
   const [selectedMedicines, setSelectedMedicines] = useState([]);
   const [potentialInteractions, setPotentialInteractions] = useState([]);
   const [allMedicines, setAllMedicines] = useState([]);
   const { speak } = useAccessibility();
+  const { medicines: storeMedicines } = useMedicineStore();
 
-  // Mock medicine data
-  const mockMedicines = [
-    { id: 1, name: "Warfarin", category: "Blood Thinner" },
-    { id: 2, name: "Aspirin", category: "Pain Relief" },
-    { id: 3, name: "Ibuprofen", category: "Anti-inflammatory" },
-    { id: 4, name: "Simvastatin", category: "Cholesterol" },
-    { id: 5, name: "Metformin", category: "Diabetes" },
-    { id: 6, name: "Lisinopril", category: "Blood Pressure" },
-    { id: 7, name: "Levothyroxine", category: "Thyroid" },
-    { id: 8, name: "Albuterol", category: "Asthma" }
-  ];
+  // const { medicines: storeMedicines } = useMedicineStore(); // Use real store - Removed duplicate
+  // const [selectedMedicines, setSelectedMedicines] = useState([]); - Removed duplicate
+  // const [potentialInteractions, setPotentialInteractions] = useState([]); - Removed duplicate
+  // const [allMedicines, setAllMedicines] = useState([]); - Removed duplicate
+  // const { speak } = useAccessibility(); - Removed duplicate
 
-  // Mock interactions data
-  const mockInteractions = [
-    {
-      medicines: ["Warfarin", "Aspirin"],
-      severity: "High",
-      description: "Increased risk of bleeding when taken together",
-      recommendation: "Consult your doctor before combining these medications"
-    },
-    {
-      medicines: ["Warfarin", "Ibuprofen"],
-      severity: "Moderate",
-      description: "May increase bleeding risk",
-      recommendation: "Monitor for signs of bleeding"
-    },
-    {
-      medicines: ["Simvastatin", "Warfarin"],
-      severity: "Moderate",
-      description: "May increase risk of muscle damage",
-      recommendation: "Regular monitoring of liver enzymes recommended"
-    },
-    {
-      medicines: ["Lisinopril", "Ibuprofen"],
-      severity: "Low",
-      description: "May reduce effectiveness of Lisinopril",
-      recommendation: "Monitor blood pressure regularly"
+  // Load real medicines instead of mocks
+  useEffect(() => {
+    if (storeMedicines && storeMedicines.length > 0) {
+      setAllMedicines(storeMedicines);
     }
-  ];
+  }, [storeMedicines]);
 
   useEffect(() => {
-    setAllMedicines(mockMedicines);
-  }, []);
-
-  useEffect(() => {
+    // Simplistic Check for now (To be replaced by API call)
+    // This prevents showing "Mock" interaction data that is false
     if (selectedMedicines.length >= 2) {
-      const foundInteractions = mockInteractions.filter(interaction => 
-        interaction.medicines.every(med => selectedMedicines.includes(med))
-      );
-      setPotentialInteractions(foundInteractions);
-      
-      if (foundInteractions.length > 0) {
-        speak(`Found ${foundInteractions.length} potential interactions between selected medicines.`);
-      } else {
-        speak('No known interactions found between selected medicines.');
-      }
-    } else {
+      // In future: calculate specific interactions via API
+      // For now, clear the mock interactions so we don't frighten user with false data
       setPotentialInteractions([]);
     }
-  }, [selectedMedicines, speak]);
+  }, [selectedMedicines]);
 
   const toggleMedicineSelection = (medicineName) => {
     if (selectedMedicines.includes(medicineName)) {
@@ -82,16 +46,16 @@ const MedicineInteractionChecker = () => {
   };
 
   return (
-    <div style={{ 
-      backgroundColor: '#ede9fe', 
-      border: '2px solid #8b5cf6', 
-      borderRadius: '8px', 
-      padding: '24px' 
+    <div style={{
+      backgroundColor: '#ede9fe',
+      border: '2px solid #8b5cf6',
+      borderRadius: '8px',
+      padding: '24px'
     }}>
-      <h2 
-        style={{ 
-          fontSize: '20px', 
-          fontWeight: '600', 
+      <h2
+        style={{
+          fontSize: '20px',
+          fontWeight: '600',
           color: '#7c3aed',
           marginBottom: '16px',
           display: 'flex',
@@ -102,18 +66,18 @@ const MedicineInteractionChecker = () => {
         <span style={{ fontSize: '24px', marginRight: '10px' }}>⚠️</span>
         Medicine Interaction Checker
       </h2>
-      
-      <p style={{ 
-        color: '#7c3aed', 
+
+      <p style={{
+        color: '#7c3aed',
         marginBottom: '16px',
         fontSize: '16px'
       }} tabIndex="0">
         Select medicines to check for potential interactions:
       </p>
-      
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', 
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
         gap: '12px',
         marginBottom: '20px'
       }}>
@@ -140,15 +104,15 @@ const MedicineInteractionChecker = () => {
           </button>
         ))}
       </div>
-      
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: '20px'
       }}>
-        <p style={{ 
-          color: '#7c3aed', 
+        <p style={{
+          color: '#7c3aed',
           fontWeight: '500',
           fontSize: '14px'
         }} tabIndex="0">
@@ -170,44 +134,44 @@ const MedicineInteractionChecker = () => {
           Clear Selection
         </button>
       </div>
-      
+
       {potentialInteractions.length > 0 ? (
         <div>
-          <h3 style={{ 
-            fontSize: '18px', 
-            fontWeight: '600', 
+          <h3 style={{
+            fontSize: '18px',
+            fontWeight: '600',
             color: '#b91c1c',
             marginBottom: '12px'
           }} tabIndex="0">
             Potential Interactions Found
           </h3>
-          
+
           {potentialInteractions.map((interaction, index) => (
-            <div 
+            <div
               key={index}
               style={{
-                backgroundColor: interaction.severity === 'High' ? '#fee2e2' : 
-                               interaction.severity === 'Moderate' ? '#ffedd5' : '#fef3c7',
-                border: `2px solid ${interaction.severity === 'High' ? '#fecaca' : 
-                         interaction.severity === 'Moderate' ? '#fed1a4' : '#fde68a'}`,
+                backgroundColor: interaction.severity === 'High' ? '#fee2e2' :
+                  interaction.severity === 'Moderate' ? '#ffedd5' : '#fef3c7',
+                border: `2px solid ${interaction.severity === 'High' ? '#fecaca' :
+                  interaction.severity === 'Moderate' ? '#fed1a4' : '#fde68a'}`,
                 borderRadius: '6px',
                 padding: '16px',
                 marginBottom: '12px'
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <h4 style={{ 
-                  fontSize: '16px', 
-                  fontWeight: '600', 
-                  color: interaction.severity === 'High' ? '#dc2626' : 
-                         interaction.severity === 'Moderate' ? '#ea580c' : '#ca8a04'
+                <h4 style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: interaction.severity === 'High' ? '#dc2626' :
+                    interaction.severity === 'Moderate' ? '#ea580c' : '#ca8a04'
                 }}>
                   {interaction.medicines.join(' + ')}
                 </h4>
                 <span style={{
                   padding: '4px 8px',
-                  backgroundColor: interaction.severity === 'High' ? '#dc2626' : 
-                                 interaction.severity === 'Moderate' ? '#ea580c' : '#ca8a04',
+                  backgroundColor: interaction.severity === 'High' ? '#dc2626' :
+                    interaction.severity === 'Moderate' ? '#ea580c' : '#ca8a04',
                   color: 'white',
                   borderRadius: '4px',
                   fontSize: '12px',
@@ -216,15 +180,19 @@ const MedicineInteractionChecker = () => {
                   {interaction.severity.toUpperCase()} RISK
                 </span>
               </div>
-              
-              <p style={{ color: interaction.severity === 'High' ? '#dc2626' : 
-                         interaction.severity === 'Moderate' ? '#ea580c' : '#ca8a04', 
-                         marginBottom: '8px' }}>
+
+              <p style={{
+                color: interaction.severity === 'High' ? '#dc2626' :
+                  interaction.severity === 'Moderate' ? '#ea580c' : '#ca8a04',
+                marginBottom: '8px'
+              }}>
                 <strong>Description:</strong> {interaction.description}
               </p>
-              
-              <p style={{ color: interaction.severity === 'High' ? '#dc2626' : 
-                         interaction.severity === 'Moderate' ? '#ea580c' : '#ca8a04' }}>
+
+              <p style={{
+                color: interaction.severity === 'High' ? '#dc2626' :
+                  interaction.severity === 'Moderate' ? '#ea580c' : '#ca8a04'
+              }}>
                 <strong>Recommendation:</strong> {interaction.recommendation}
               </p>
             </div>
@@ -238,8 +206,8 @@ const MedicineInteractionChecker = () => {
           padding: '16px',
           textAlign: 'center'
         }}>
-          <p style={{ 
-            color: '#16a34a', 
+          <p style={{
+            color: '#16a34a',
             fontWeight: '600',
             fontSize: '16px'
           }} tabIndex="0">
@@ -257,8 +225,8 @@ const MedicineInteractionChecker = () => {
           padding: '16px',
           textAlign: 'center'
         }}>
-          <p style={{ 
-            color: '#d97706', 
+          <p style={{
+            color: '#d97706',
             fontWeight: '600',
             fontSize: '16px'
           }} tabIndex="0">
@@ -273,8 +241,8 @@ const MedicineInteractionChecker = () => {
           padding: '16px',
           textAlign: 'center'
         }}>
-          <p style={{ 
-            color: '#0284c7', 
+          <p style={{
+            color: '#0284c7',
             fontWeight: '600',
             fontSize: '16px'
           }} tabIndex="0">
@@ -282,17 +250,17 @@ const MedicineInteractionChecker = () => {
           </p>
         </div>
       )}
-      
-      <div style={{ 
-        marginTop: '20px', 
-        padding: '16px', 
-        backgroundColor: '#f0f9ff', 
+
+      <div style={{
+        marginTop: '20px',
+        padding: '16px',
+        backgroundColor: '#f0f9ff',
         border: '2px solid #bae6fd',
-        borderRadius: '6px' 
+        borderRadius: '6px'
       }}>
-        <h3 style={{ 
-          fontSize: '16px', 
-          fontWeight: '600', 
+        <h3 style={{
+          fontSize: '16px',
+          fontWeight: '600',
           color: '#0284c7',
           marginBottom: '8px',
           display: 'flex',
@@ -302,8 +270,8 @@ const MedicineInteractionChecker = () => {
           Important Note
         </h3>
         <p style={{ color: '#0284c7', fontSize: '14px' }} tabIndex="0">
-          This interaction checker is for informational purposes only. 
-          Always consult your healthcare provider or pharmacist for personalized advice 
+          This interaction checker is for informational purposes only.
+          Always consult your healthcare provider or pharmacist for personalized advice
           about potential drug interactions.
         </p>
       </div>

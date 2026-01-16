@@ -23,34 +23,34 @@ const VibrantDashboard = () => {
     try {
       const allReminders = reminderService.getAllReminders();
       setReminders(allReminders);
-      
+
       // Calculate stats
       const now = new Date();
       const todayStart = new Date(now.setHours(0, 0, 0, 0));
       const todayEnd = new Date(now.setHours(23, 59, 59, 999));
-      
-      const upcomingDoses = allReminders.filter(reminder => 
-        new Date(reminder.nextDue) >= todayStart && 
+
+      const upcomingDoses = allReminders.filter(reminder =>
+        new Date(reminder.nextDue) >= todayStart &&
         new Date(reminder.nextDue) <= todayEnd
       ).length;
-      
-      const takenToday = allReminders.filter(reminder => 
-        reminder.lastTaken && 
-        new Date(reminder.lastTaken) >= todayStart && 
+
+      const takenToday = allReminders.filter(reminder =>
+        reminder.lastTaken &&
+        new Date(reminder.lastTaken) >= todayStart &&
         new Date(reminder.lastTaken) <= todayEnd
       ).length;
-      
-      const expiredMedicines = medicines?.filter(medicine => 
+
+      const expiredMedicines = medicines?.filter(medicine =>
         new Date(medicine.expiryDate) < new Date()
       ).length || 0;
-      
+
       setStats({
         totalMedicines: medicines?.length || 0,
         upcomingDoses,
         takenToday,
         expiredMedicines
       });
-      
+
       setIsLoading(false);
     } catch (err) {
       console.error('Error loading dashboard data:', err);
@@ -109,8 +109,8 @@ const VibrantDashboard = () => {
 
   // Format time
   const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString([], { 
-      hour: '2-digit', 
+    return new Date(date).toLocaleTimeString([], {
+      hour: '2-digit',
       minute: '2-digit',
       hour12: true
     });
@@ -123,11 +123,11 @@ const VibrantDashboard = () => {
           <LoadingSpinner size="lg" />
         </div>
       )}
-      
+
       {error && (
         <Alert type="error" message={`Error loading dashboard: ${error}`} />
       )}
-      
+
       {!isLoading && !error && (
         <>
           {/* Header with vibrant background */}
@@ -142,8 +142,8 @@ const VibrantDashboard = () => {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {statCards.map((stat, index) => (
-              <Card 
-                key={index} 
+              <Card
+                key={index}
                 className={`p-5 bg-gradient-to-br ${stat.color} text-white transform hover:scale-105 transition-transform duration-300`}
               >
                 <div className="flex items-center justify-between">
@@ -165,12 +165,12 @@ const VibrantDashboard = () => {
                 <span className="mr-2">⏰</span>
                 Upcoming Doses
               </h2>
-              
+
               {upcomingDoses.length > 0 ? (
                 <div className="space-y-3">
                   {upcomingDoses.map((reminder, index) => (
-                    <div 
-                      key={index} 
+                    <div
+                      key={index}
                       className="flex justify-between items-center p-3 bg-white rounded-lg border border-blue-100 hover:shadow-md transition-shadow"
                     >
                       <div>
@@ -201,37 +201,37 @@ const VibrantDashboard = () => {
                 <span className="mr-2">⚡</span>
                 Quick Actions
               </h2>
-              
+
               <div className="grid grid-cols-2 gap-3">
-                <Button 
-                  variant="primary" 
+                <Button
+                  variant="primary"
                   className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 h-full"
                   onClick={() => window.location.href = '/scan'}
                 >
                   <span className="text-xl">📷</span>
                   <span className="ml-2">Scan</span>
                 </Button>
-                
-                <Button 
-                  variant="primary" 
+
+                <Button
+                  variant="primary"
                   className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 h-full"
                   onClick={() => window.location.href = '/reminders'}
                 >
                   <span className="text-xl">🔔</span>
                   <span className="ml-2">Reminders</span>
                 </Button>
-                
-                <Button 
-                  variant="primary" 
+
+                <Button
+                  variant="primary"
                   className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 h-full"
                   onClick={() => window.location.href = '/medicines'}
                 >
                   <span className="text-xl">💊</span>
                   <span className="ml-2">Medicines</span>
                 </Button>
-                
-                <Button 
-                  variant="primary" 
+
+                <Button
+                  variant="primary"
                   className="bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 h-full"
                   onClick={() => window.location.href = '/profile'}
                 >
@@ -239,10 +239,10 @@ const VibrantDashboard = () => {
                   <span className="ml-2">Profile</span>
                 </Button>
               </div>
-              
+
               <div className="mt-4 pt-4 border-t border-purple-200">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full border-purple-500 text-purple-700 hover:bg-purple-50"
                   onClick={() => window.location.href = '/settings'}
                 >
@@ -258,26 +258,38 @@ const VibrantDashboard = () => {
               <span className="mr-2">📊</span>
               Medicine Categories
             </h2>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-            { name: 'Pain Relief', count: medicines?.filter(m => m?.name?.toLowerCase().includes('paracetamol') || m?.name?.toLowerCase().includes('ibuprofen'))?.length || 0, color: 'bg-red-500' },
-            { name: 'Antibiotics', count: medicines?.filter(m => m?.name?.toLowerCase().includes('amoxicillin') || m?.name?.toLowerCase().includes('antibiotic'))?.length || 0, color: 'bg-blue-500' },
-            { name: 'Vitamins', count: medicines?.filter(m => m?.name?.toLowerCase().includes('vitamin'))?.length || 0, color: 'bg-green-500' },
-            { name: 'Others', count: medicines?.filter(m => !m?.name?.toLowerCase().includes('paracetamol') && !m?.name?.toLowerCase().includes('ibuprofen') && !m?.name?.toLowerCase().includes('amoxicillin') && !m?.name?.toLowerCase().includes('antibiotic') && !m?.name?.toLowerCase().includes('vitamin'))?.length || 0, color: 'bg-purple-500' }
-          ].map((category, index) => (
-            <div key={index} className="text-center p-4 bg-white rounded-lg border border-yellow-100">
-              <div className={`${category.color} w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 text-white font-bold`}>
-                {category.count}
-              </div>
-              <h3 className="font-medium text-gray-900">{category.name}</h3>
-              <p className="text-sm text-gray-600">{category.count} medicines</p>
+              {Object.entries(
+                medicines?.reduce((acc, med) => {
+                  const cat = med.category || 'Uncategorized';
+                  acc[cat] = (acc[cat] || 0) + 1;
+                  return acc;
+                }, {}) || {}
+              ).map(([categoryName, count], index) => {
+                // Dynamic color generation based on index
+                const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 'bg-yellow-500', 'bg-indigo-500'];
+                const color = colors[index % colors.length];
+
+                return (
+                  <div key={index} className="text-center p-4 bg-white rounded-lg border border-yellow-100">
+                    <div className={`${color} w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 text-white font-bold`}>
+                      {count}
+                    </div>
+                    <h3 className="font-medium text-gray-900 truncate px-2" title={categoryName}>{categoryName}</h3>
+                    <p className="text-sm text-gray-600">{count} medicine{count !== 1 ? 's' : ''}</p>
+                  </div>
+                );
+              })}
+              {(!medicines || medicines.length === 0) && (
+                <div className="col-span-full text-center text-gray-500 py-4">
+                  No medicines added yet.
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      </Card>
-      </>
-    )}
+          </Card>
+        </>
+      )}
     </div>
   );
 };

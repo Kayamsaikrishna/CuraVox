@@ -49,17 +49,13 @@ const ScanPage = () => {
   const handleCapture = async (imageFile) => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const formData = new FormData();
       formData.append('image', imageFile);
-      
-      const response = await api.post('/ocr/process', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
+
+      const response = await api.post('/ocr/process', formData);
+
       if (response.data.success) {
         setOcrResult(response.data.data);
         speak("OCR scan completed successfully");
@@ -80,17 +76,19 @@ const ScanPage = () => {
   const handleUpload = async (imageFile) => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const formData = new FormData();
       formData.append('image', imageFile);
-      
+
+      // console.log('Uploading file:', imageFile.name, imageFile.type, imageFile.size);
+
       const response = await api.post('/ocr/process', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+          'Content-Type': undefined // Let browser set multipart/form-data with boundary
+        }
       });
-      
+
       if (response.data.success) {
         setOcrResult(response.data.data);
         speak("Image uploaded and processed successfully");
@@ -100,9 +98,11 @@ const ScanPage = () => {
       }
     } catch (err) {
       console.error('Upload Error:', err);
-      setError(err.message || 'Failed to process image');
-      speak("Error processing uploaded image. Please try again.");
-      voiceService.speak("Image processing failed. Please try again.");
+      const msg = err.response?.data?.message || err.message || 'Failed to process image';
+      setError(msg);
+      alert('OCR Failed: ' + msg); // Force user to see exact cause
+      speak("Error processing uploaded image. " + msg);
+      voiceService.speak("Image processing failed: " + msg);
     } finally {
       setIsLoading(false);
     }
@@ -132,11 +132,10 @@ const ScanPage = () => {
         {/* Tab Navigation */}
         <div className="flex border-b border-gray-200 mb-6">
           <button
-            className={`py-2 px-4 font-medium text-sm ${
-              activeTab === 'camera'
-                ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`py-2 px-4 font-medium text-sm ${activeTab === 'camera'
+              ? 'border-b-2 border-blue-500 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
             onClick={() => setActiveTab('camera')}
             aria-selected={activeTab === 'camera'}
             role="tab"
@@ -144,11 +143,10 @@ const ScanPage = () => {
             Camera Scan
           </button>
           <button
-            className={`py-2 px-4 font-medium text-sm ${
-              activeTab === 'upload'
-                ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`py-2 px-4 font-medium text-sm ${activeTab === 'upload'
+              ? 'border-b-2 border-blue-500 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
             onClick={() => setActiveTab('upload')}
             aria-selected={activeTab === 'upload'}
             role="tab"
@@ -189,12 +187,28 @@ const ScanPage = () => {
                 Scan Another
               </Button>
             </div>
-            
-            <OCRResultDisplay 
-              result={ocrResult} 
-              isLoading={isLoading} 
-              error={error} 
+
+            <OCRResultDisplay
+              result={ocrResult}
+              isLoading={isLoading}
+              error={error}
             />
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200 animate-pulse text-center">
+            <h3 className="text-yellow-800 font-semibold text-lg flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Analyzing Medicine...
+            </h3>
+            <p className="text-yellow-700 mt-2">
+              This might take a moment while we wake up the AI brain. <br />
+              Please wait...
+            </p>
           </div>
         )}
       </Card>

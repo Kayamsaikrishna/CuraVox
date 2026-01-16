@@ -10,7 +10,9 @@ import logging
 
 # Suppress TensorFlow and OneDNN warnings
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=no info, 2=no warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # 3=FATAL only (Hides warnings/errors)
+import logging
+logging.getLogger('tensorflow').setLevel(logging.FATAL)
 
 import time
 import json
@@ -76,11 +78,11 @@ class MedicalAICore:
         self.agent_orchestrator = MedicalAgentOrchestrator()
         self.cache_manager = cache_manager
         
-        # Initialize Hugging Face Pipelines (Graceful fallback)
+        # Lazy load Hugging Face Pipelines only when needed
         self.qa_pipeline = None
         self.nlp_pipeline = None
         self.summarizer = None
-        self._initialize_transformer_models()
+        # self._initialize_transformer_models() # Removed to prevent 10s startup delay
         
         # Check system availability
         self.llm_available = self.local_llm.check_connection()
@@ -88,23 +90,35 @@ class MedicalAICore:
         
         logger.info("Medical AI Core system initialized successfully")
 
-    def _initialize_transformer_models(self):
-        """Initialize local Transformer models for NLP tasks"""
-        try:
-            logger.info("Loading Hugging Face Transformer models...")
-            # 1. NER for Entity Extraction (Drugs, Symptoms)
-            self.nlp_pipeline = pipeline("ner", model="dslim/bert-base-NER", grouped_entities=True)
-            
-            # 2. QA for precise answers
-            self.qa_pipeline = pipeline("question-answering", model="deepset/roberta-base-squad2")
-            
-            # 3. Summarization for patient history
-            self.summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-            
-            logger.info("Transformer models loaded successfully")
-        except Exception as e:
-            logger.warning(f"Could not load Transformer models: {e}. Falling back to Regex/LLM.")
+    def get_nlp_pipeline(self):
+        """Lazy load NER pipeline"""
+        if not self.nlp_pipeline:
+             try:
+                logger.info("Loading BERT NER model (Lazy Load)...")
+                self.nlp_pipeline = pipeline("ner", model="dslim/bert-base-NER", grouped_entities=True)
+             except Exception as e:
+                logger.warning(f"Failed to load NER: {e}")
+        return self.nlp_pipeline
 
+    def get_qa_pipeline(self):
+        if not self.qa_pipeline:
+             try:
+                logger.info("Loading RoBERTa QA model (Lazy Load)...")
+                self.qa_pipeline = pipeline("question-answering", model="deepset/roberta-base-squad2")
+             except: pass
+        return self.qa_pipeline
+
+    def get_summarizer(self):
+        if not self.summarizer:
+             try:
+                logger.info("Loading BART Summarizer (Lazy Load)...")
+                self.summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+             except: pass
+        return self.summarizer
+
+    # def _initialize_transformer_models(self): # Deprecated
+    #     """Initialize local Transformer models for NLP tasks"""
+    
     def process_voice_command_intent(self, command: str, user_id: str) -> Dict[str, Any]:
         """
         Main entry point for Voice Logic.
@@ -145,9 +159,10 @@ class MedicalAICore:
 
     def _extract_entity(self, text: str, entity_type: str) -> Optional[str]:
         """Try BERT NER first, then fallback to heuristics"""
-        if self.nlp_pipeline:
+        nlp = self.get_nlp_pipeline()
+        if nlp:
             try:
-                entities = self.nlp_pipeline(text)
+                entities = nlp(text)
                 # Filter for something looking like a drug (MISC or ORG often in generic NER)
                 # This is a simplification. Real medical NER (BioBERT) would be better.
                 for ent in entities:
@@ -263,12 +278,6 @@ class MedicalAICore:
     def analyze_medicine_from_text(self, text: str) -> MedicineInfo:
         """
         Analyze medicine information from text
-        
-        Args:
-            text: Text containing medicine information
-            
-        Returns:
-            Detailed medicine information
         """
         # Check cache first
         cache_key = f"medicine_text:{hash(text)}"
@@ -277,9 +286,60 @@ class MedicalAICore:
             logger.info("Retrieved cached medicine analysis from text")
             return cached_result
         
-        # Analyze medicine information
+        # 1. Try Optimized Analyzer (Regex + Knowledge Base)
         medicine_info = self.medicine_analyzer.analyze_medicine_from_text(text)
         
+        # 2. LLM Fallback: ALWAYS ENGAGE if text looks like a Multi-Angle Scan (contains "[Angle") or if confidence is low.
+        # The user specifically requested "Doctor-like" behavior for tricky images, so we prioritize the LLM's reasoning.
+        is_multi_angle = "[Angle" in text
+        
+        if (medicine_info.name == "Unknown Medicine" or medicine_info.confidence_score < 0.7 or is_multi_angle) and self.llm_available:
+            logger.info("Engaging Local LLM for Deep Multi-Angle Analysis...")
+            
+            prompt = f"""
+            I have scanned a medicine strip from 4 different angles to capture all text.
+            Here is the combined noisy OCR text:
+            
+            "{text}"
+            
+            Your Task:
+            1. Look through the noise in all angles.
+            2. Identify the MEDICINE NAME (Brand or Generic). Look for patterns like "Metformin", "Paracetamol", etc.
+            3. Identify the DOSAGE (e.g., 500mg, 10mg). Ignore realistic-looking typos (like '5000mg') if they seem impossible, assume standard dosages.
+            4. Reconstruct the likely true information.
+            
+            Return ONLY a valid JSON object with:
+            {{
+                "name": "Identified Name",
+                "uses": ["Use 1", "Use 2"],
+                "side_effects": ["Side Effect 1"],
+                "dosage": "Standard Dosage",
+                "warnings": ["Warning 1"]
+            }}
+            """
+            
+            llm_response = self.local_llm.generate_medical_response(prompt)
+            
+            # Attempt to parse LLM JSON response
+            try:
+                # Find JSON block in response
+                import re
+                json_match = re.search(r'\{.*\}', llm_response.response, re.DOTALL)
+                if json_match:
+                    data = json.loads(json_match.group(0))
+                    
+                    # Update medicine info with LLM intelligence
+                    medicine_info.name = data.get('name', medicine_info.name)
+                    medicine_info.uses = data.get('uses', medicine_info.uses)
+                    medicine_info.side_effects = data.get('side_effects', medicine_info.side_effects)
+                    medicine_info.dosage_instructions = str(data.get('dosage', medicine_info.dosage_instructions))
+                    medicine_info.warnings = data.get('warnings', medicine_info.warnings)
+                    medicine_info.confidence_score = 0.90 # High confidence in LLM reasoning
+                    
+                    logger.info(f"LLM successfully deduced medicine from multi-angle scan: {medicine_info.name}")
+            except Exception as e:
+                logger.warning(f"Failed to parse LLM JSON fallback: {e}")
+                
         # Cache the result
         self.cache_manager.cache_medicine_info(cache_key, medicine_info)
         
@@ -486,7 +546,7 @@ def main():
     
     # Read input parameters from file
     try:
-        with open(args.input, 'r') as f:
+        with open(args.input, 'r', encoding='utf-8') as f:
             input_params = json.load(f)
     except Exception as e:
         print(json.dumps({"error": f"Failed to read input file: {str(e)}"}), flush=True)

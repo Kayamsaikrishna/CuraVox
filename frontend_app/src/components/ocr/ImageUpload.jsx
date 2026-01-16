@@ -13,7 +13,11 @@ const ImageUpload = ({ onUpload, isLoading, accept = 'image/*' }) => {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept,
+    accept: {
+      'image/jpeg': [],
+      'image/png': [],
+      'image/jpg': []
+    },
     multiple: false,
     maxSize: 5 * 1024 * 1024, // 5MB limit
   });

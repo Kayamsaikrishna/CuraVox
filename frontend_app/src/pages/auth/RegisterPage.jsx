@@ -2,19 +2,29 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import api from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: '',
-    username: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login, isAuthenticated } = useAuth(); // Auto-login after register
+
+  // Redirect if already logged in
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/home', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -26,31 +36,55 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Basic validation
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
-    
-    if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters long');
+
+    if (formData.password.length < 8) {
+      toast.error('Password must be at least 8 characters long');
       return;
     }
-    
+
     setIsLoading(true);
 
     try {
-      // Simulate API call - in a real app, this would call your backend API
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock registration success
-      toast.success('Account created successfully!');
-      
-      // Redirect to login page
-      navigate('/login');
+      const payload = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password
+      };
+
+      console.log('Registering user:', payload);
+      const response = await api.post('/auth/register', payload);
+
+      if (response.data.success) {
+        toast.success('Account created successfully!');
+
+        try {
+          const { default: VoiceService } = await import('../../services/voiceService');
+          VoiceService.getInstance().speak('Account created successfully. Logging you in.');
+        } catch (e) { }
+
+        // Attempt auto-login
+        await login(formData.email, formData.password);
+        navigate('/home');
+      } else {
+        const msg = response.data.message || 'Registration failed';
+        alert(msg); // Force user to see it
+        toast.error(msg);
+        try {
+          const { default: VoiceService } = await import('../../services/voiceService');
+          VoiceService.getInstance().speak(msg);
+        } catch (e) { }
+      }
+
     } catch (error) {
-      toast.error('Registration failed. Please try again.');
+      console.error('Registration error:', error);
+      toast.error(error.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -70,37 +104,38 @@ const RegisterPage = () => {
             </Link>
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="fullName" className="sr-only">Full Name</label>
-              <input
-                id="fullName"
-                name="fullName"
-                type="text"
-                required
-                value={formData.fullName}
-                onChange={handleInputChange}
-                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white dark:bg-gray-700 mb-1"
-                placeholder="Full Name"
-              />
+            <div className="flex gap-2">
+              <div className="w-1/2">
+                <label htmlFor="firstName" className="sr-only">First Name</label>
+                <input
+                  id="firstName"
+                  name="firstName"
+                  type="text"
+                  required
+                  value={formData.firstName}
+                  onChange={handleInputChange}
+                  className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white dark:bg-gray-700 mb-1"
+                  placeholder="First Name"
+                />
+              </div>
+              <div className="w-1/2">
+                <label htmlFor="lastName" className="sr-only">Last Name</label>
+                <input
+                  id="lastName"
+                  name="lastName"
+                  type="text"
+                  required
+                  value={formData.lastName}
+                  onChange={handleInputChange}
+                  className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white dark:bg-gray-700 mb-1"
+                  placeholder="Last Name"
+                />
+              </div>
             </div>
-            
-            <div>
-              <label htmlFor="username" className="sr-only">Username</label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                required
-                value={formData.username}
-                onChange={handleInputChange}
-                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white dark:bg-gray-700 mb-1"
-                placeholder="Username"
-              />
-            </div>
-            
+
             <div>
               <label htmlFor="email" className="sr-only">Email Address</label>
               <input
@@ -114,7 +149,7 @@ const RegisterPage = () => {
                 placeholder="Email Address"
               />
             </div>
-            
+
             <div className="relative">
               <label htmlFor="password" className="sr-only">Password</label>
               <input
@@ -141,7 +176,7 @@ const RegisterPage = () => {
                 )}
               </button>
             </div>
-            
+
             <div className="relative">
               <label htmlFor="confirmPassword" className="sr-only">Confirm Password</label>
               <input
@@ -203,7 +238,7 @@ const RegisterPage = () => {
             </button>
           </div>
         </form>
-        
+
         <div className="mt-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
           <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Accessibility Features</h3>
           <p className="text-sm text-gray-600 dark:text-gray-300">

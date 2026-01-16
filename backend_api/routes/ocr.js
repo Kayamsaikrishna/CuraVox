@@ -49,6 +49,7 @@ const upload = multer({
 router.post('/process', protect, upload.single('image'), [
   body('confidenceThreshold').optional().isFloat({ min: 0, max: 100 })
 ], async (req, res) => {
+  console.log('OCR Request Headers:', req.headers['content-type']);
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -103,7 +104,7 @@ router.post('/process', protect, upload.single('image'), [
       // If medicine name was detected, try to match with existing medicine
       if (ocrResult.medicineName) {
         ocrRecord.medicineName = ocrResult.medicineName;
-        
+
         // Find matching medicine in database
         const matchedMedicine = await Medicine.findOne({
           $or: [
@@ -123,9 +124,7 @@ router.post('/process', protect, upload.single('image'), [
       res.json({
         success: true,
         message: 'Image processed successfully with OCR',
-        data: {
-          ocrResult: ocrRecord
-        }
+        data: ocrRecord
       });
     } catch (ocrError) {
       // Clean up uploaded file if OCR processing failed

@@ -2,7 +2,9 @@ const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
-const { medicalAIService } = require('../ai_ml_engine');
+const { AdvancedMedicalAI } = require('./aiService');
+
+const medicalAIService = new AdvancedMedicalAI();
 
 /**
  * Process image with OCR
@@ -13,6 +15,45 @@ const { medicalAIService } = require('../ai_ml_engine');
 const processImageWithOCR = async (imagePath, options = {}) => {
   return new Promise(async (resolve, reject) => {
     try {
+      // 1. TRY GEMINI FLASH FIRST (Cognitive Vision)
+      // Restored this block as User now has an API Key
+      if (process.env.GEMINI_API_KEY) {
+        console.log("🚀 Using Gemini Vision (Dr. CuraVox) for Analysis...");
+        const geminiService = require('./geminiService');
+        try {
+          // Gemini does OCR + Analysis in one shot
+          const geminiResult = await geminiService.analyzeImage(imagePath);
+
+          console.log("🔍 DEBUG: Gemini Raw Result:", JSON.stringify(geminiResult, null, 2));
+
+          if (geminiResult) {
+            resolve({
+              text: geminiResult.extractedText || "Gemini Vision Analysis",
+              confidence: (geminiResult.confidence || 0.9) * 100,
+              language: 'eng',
+              processingTime: Date.now() - Date.now(), // Approximate
+              engine: 'gemini-2.5-flash',
+              engineVersion: '2.5.0',
+              medicineName: geminiResult.medicineName,
+              processedImagePath: imagePath, // No processing needed for Vision AI
+              aiAnalysis: {
+                identifiedMedicine: geminiResult.medicineName,
+                confidence: geminiResult.confidence,
+                dosageInfo: geminiResult.strength,
+                usageInfo: Array.isArray(geminiResult.uses) ? geminiResult.uses.join(', ') : geminiResult.uses,
+                sideEffects: geminiResult.sideEffects,
+                warnings: geminiResult.warnings,
+                recommendations: [geminiResult.doctor_insight || "Consult a doctor"]
+              }
+            });
+            return; // EXIT FUNCTION, WE ARE DONE
+          }
+        } catch (geminiError) {
+          console.error("Gemini failed, falling back to local OCR:", geminiError);
+          // Verify fall through to Tesseract
+        }
+      }
+
       const {
         confidenceThreshold = 80,
         userId = null,
@@ -20,51 +61,74 @@ const processImageWithOCR = async (imagePath, options = {}) => {
         language = 'eng'
       } = options;
 
-      // Record start time for processing time calculation
+      // Record start time
       const startTime = Date.now();
 
-      // Preprocess image for better OCR results
-      const processedImagePath = await preprocessImage(imagePath);
+      // 1. Deep Preprocessing (High-Res Upscale for Small Text)
+      // We create a "Scan Ready" version of the image
+      const processedImagePath = await preprocessImageHighRes(imagePath);
 
-      // Perform OCR using Tesseract
-      const result = await Tesseract.recognize(
-        processedImagePath,
-        language,
-        {
-          logger: (progress) => {
-            // Log progress if needed
-            console.log(`OCR Progress: ${Math.round(progress.progress * 100)}%`);
+      // 2. Multi-Angle OCR (0, 90, 180, 270 degrees)
+      // Medicine strips often have text in different orientations. We scan ALL of them.
+      const angles = [0, 90, 180, 270];
+      let combinedText = "";
+      let maxConfidence = 0;
+      let primaryMedicineName = null;
+
+      console.log("Starting Multi-Angle Deep Scan... This may take a moment.");
+
+      // Run OCR on all angles sequentially (to save memory) or parallel (if robust)
+      // Sequential is safer for reliability
+      for (const angle of angles) {
+        const rotatedImagePath = await rotateImage(processedImagePath, angle);
+
+        const result = await Tesseract.recognize(
+          rotatedImagePath,
+          language,
+          {
+            logger: m => { } // Silence individual loggers to keep console clean
+          },
+          {
+            tessedit_pageseg_mode: '6', // Assume uniform block of text
+            preserve_interword_spaces: '1'
           }
+        );
+
+        const text = result.data.text.trim();
+        const conf = result.data.confidence;
+
+        if (text.length > 5) {
+          combinedText += `\n[Angle ${angle}° Scan]: ${text}`;
+          if (conf > maxConfidence) maxConfidence = conf;
+
+          // Try to detect name in this specific angle
+          const detected = detectMedicineName(text);
+          if (detected && !primaryMedicineName) primaryMedicineName = detected;
         }
-      );
 
-      // Calculate processing time
-      const processingTime = Date.now() - startTime;
+        // Cleanup temp rotated file
+        try { fs.unlinkSync(rotatedImagePath); } catch (e) { }
+      }
 
-      // Extract text and confidence
-      const extractedText = result.data.text;
-      const confidence = result.data.confidence;
+      console.log("Multi-Angle Scan Complete. Analyzing findings...");
 
-      // Detect medicine name from extracted text
-      const medicineName = detectMedicineName(extractedText);
-
-      // Perform AI analysis (simulated for now)
-      const aiAnalysis = await performAIAnalysis(extractedText, medicineName);
+      // Perform AI analysis on the COMBINED text from all angles
+      // This gives the AI the maximum amount of context to figure out the medicine
+      const aiAnalysis = await performAIAnalysis(combinedText, primaryMedicineName);
 
       // Prepare result object
       const ocrResult = {
-        text: extractedText,
-        confidence: confidence,
+        text: combinedText, // Return all text found
+        confidence: maxConfidence,
         language: language,
-        processingTime: processingTime,
-        engine: 'tesseract.js',
+        processingTime: Date.now() - startTime,
+        engine: 'tesseract.js (Multi-Angle)',
         engineVersion: Tesseract.version,
-        medicineName: medicineName,
+        medicineName: aiAnalysis.identifiedMedicine || primaryMedicineName || "Unknown",
         processedImagePath: processedImagePath,
         aiAnalysis: aiAnalysis
       };
 
-      // Resolve with the result
       resolve(ocrResult);
     } catch (error) {
       reject(error);
@@ -73,31 +137,51 @@ const processImageWithOCR = async (imagePath, options = {}) => {
 };
 
 /**
- * Preprocess image for better OCR results
- * @param {string} imagePath - Path to the image file
- * @returns {Promise<string>} - Path to processed image
+ * Preprocess image for High-Res OCR (Upscale + Sharpen)
  */
-const preprocessImage = async (imagePath) => {
+const preprocessImageHighRes = async (imagePath) => {
   try {
-    // Create a temporary processed image path
     const ext = path.extname(imagePath);
     const baseName = path.basename(imagePath, ext);
-    const tempPath = path.join('uploads', `${baseName}_processed.png`);
+    const tempPath = path.join('uploads', `${baseName}_hires.png`);
 
-    // Process the image using Sharp
     await sharp(imagePath)
-      .resize(1200, null, { fit: 'inside' }) // Resize to max 1200px width
-      .flatten({ background: { r: 255, g: 255, b: 255 } }) // Flatten transparency
-      .sharpen() // Sharpen the image
-      .normalize() // Normalize contrast
+      .resize(2400, null, { fit: 'inside' }) // 2X larger than before for small text
+      .grayscale()
+      .normalize()
+      .sharpen({
+        sigma: 2,
+        m1: 0,
+        m2: 3,
+        x1: 2,
+        y2: 10,
+        y3: 20,
+      })
+      .toFormat('png')
       .toFile(tempPath);
 
     return tempPath;
   } catch (error) {
     console.error('Error preprocessing image:', error);
-    // If preprocessing fails, return the original image path
     return imagePath;
   }
+};
+
+/**
+ * Rotate image for multi-angle scanning
+ */
+const rotateImage = async (imagePath, angle) => {
+  if (angle === 0) return imagePath;
+
+  const ext = path.extname(imagePath);
+  const baseName = path.basename(imagePath, ext); // Corrected: removed .replace
+  const rotatedPath = path.join('uploads', `${baseName}_rot${angle}.png`);
+
+  await sharp(imagePath)
+    .rotate(angle)
+    .toFile(rotatedPath);
+
+  return rotatedPath;
 };
 
 /**
@@ -125,13 +209,13 @@ const detectMedicineName = (text) => {
   // Look for potential medicine names
   for (let i = 0; i < words.length; i++) {
     const word = words[i].toLowerCase();
-    
+
     // Check if current word or combination with next word matches medicine indicators
-    if (medicineIndicators.some(indicator => 
-      word.includes(indicator) || 
-      (i < words.length - 1 && 
-       `${word}${words[i+1].toLowerCase()}`.includes(indicator)))) {
-      
+    if (medicineIndicators.some(indicator =>
+      word.includes(indicator) ||
+      (i < words.length - 1 &&
+        `${word}${words[i + 1].toLowerCase()}`.includes(indicator)))) {
+
       // Return the likely medicine name (previous word or words)
       if (i > 0) {
         // Check if previous word is capitalized (indicating a name)
@@ -140,14 +224,14 @@ const detectMedicineName = (text) => {
           return prevWord;
         }
       }
-      
+
       // Check for brand names that are capitalized
       for (let j = Math.max(0, i - 3); j < Math.min(words.length, i + 3); j++) {
         if (j !== i) {
           const potentialName = words[j];
           // Look for capitalized words that could be medicine names
-          if (potentialName.length > 2 && /^[A-Z]/.test(potentialName) && 
-              !medicineIndicators.some(ind => potentialName.toLowerCase().includes(ind))) {
+          if (potentialName.length > 2 && /^[A-Z]/.test(potentialName) &&
+            !medicineIndicators.some(ind => potentialName.toLowerCase().includes(ind))) {
             return potentialName;
           }
         }
@@ -157,8 +241,8 @@ const detectMedicineName = (text) => {
 
   // If no specific pattern found, return the first capitalized word that looks like a medicine
   for (const word of words) {
-    if (word.length > 3 && /^[A-Z]/.test(word) && 
-        !['FOR', 'THE', 'AND', 'WITH', 'USE', 'PER'].includes(word.toUpperCase())) {
+    if (word.length > 3 && /^[A-Z]/.test(word) &&
+      !['FOR', 'THE', 'AND', 'WITH', 'USE', 'PER'].includes(word.toUpperCase())) {
       return word;
     }
   }
@@ -174,36 +258,24 @@ const detectMedicineName = (text) => {
  */
 const performAIAnalysis = async (text, medicineName) => {
   try {
-    // If we have a medicine name, use the AI service to get detailed information
-    if (medicineName) {
-      const analysis = await medicalAIService.performMedicineAnalysis('ocr_system', medicineName, text);
-      
-      return {
-        identifiedMedicine: analysis.medicineName,
-        confidence: analysis.confidence,
-        dosageInfo: analysis.dosage,
-        usageInfo: analysis.uses.join(', '),
-        sideEffects: analysis.sideEffects,
-        warnings: analysis.warnings,
-        recommendations: [
-          'Always follow prescribed dosage',
-          'Store in cool, dry place',
-          'Keep out of reach of children',
-          'Consult doctor for any concerns'
-        ]
-      };
-    } else {
-      // If no specific medicine detected, return basic analysis
-      return {
-        identifiedMedicine: 'Unknown',
-        confidence: 30,
-        dosageInfo: extractDosageInfo(text),
-        usageInfo: extractUsageInfo(text),
-        sideEffects: extractSideEffects(text),
-        warnings: extractWarnings(text),
-        recommendations: generateRecommendations(medicineName)
-      };
-    }
+    // Always use the advanced AI service to get detailed information
+    // We pass the full OCR text so the AI can find the name itself (using fuzzy match) if the simple regex failed
+    const analysis = await medicalAIService.performMedicineAnalysis('ocr_system', medicineName, text);
+
+    return {
+      identifiedMedicine: analysis.medicineName, // This will now be the corrected name (e.g. "Metformin")
+      confidence: analysis.confidence,
+      dosageInfo: analysis.dosage,
+      usageInfo: analysis.uses.join(', '),
+      sideEffects: analysis.sideEffects,
+      warnings: analysis.warnings,
+      recommendations: [
+        'Always follow prescribed dosage',
+        'Store in cool, dry place',
+        'Keep out of reach of children',
+        'Consult doctor for any concerns'
+      ]
+    };
   } catch (error) {
     console.error('Error in AI analysis:', error);
     // Fallback to basic analysis if AI service fails

@@ -18,9 +18,10 @@ router.post('/register', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Register validation failed:', errors.array());
       return res.status(400).json({
         success: false,
-        message: 'Validation error',
+        message: 'Validation error: ' + errors.array().map(e => e.msg).join(', '),
         errors: errors.array()
       });
     }
@@ -30,6 +31,7 @@ router.post('/register', [
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      console.log('Registration failed: User already exists', email);
       return res.status(400).json({
         success: false,
         message: 'User already exists with this email'
@@ -37,12 +39,14 @@ router.post('/register', [
     }
 
     // Create user
+    console.log('Attempting to create user in DB...');
     const user = await User.create({
       firstName,
       lastName,
       email,
       password
     });
+    console.log('User created successfully in DB:', user._id);
 
     // Generate token
     const token = generateToken(user._id);
@@ -60,10 +64,11 @@ router.post('/register', [
       }
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('Registration error details:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error during registration'
+      message: `Registration failed: ${error.message}`,
+      error: error.toString()
     });
   }
 });
@@ -78,6 +83,7 @@ router.post('/login', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Login validation failed:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation error',
@@ -133,10 +139,11 @@ router.post('/login', [
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Login error detailed:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error during login'
+      message: `Login failed: ${error.message}`,
+      error: error.toString()
     });
   }
 });
