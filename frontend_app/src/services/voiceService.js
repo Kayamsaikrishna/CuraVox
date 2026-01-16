@@ -143,8 +143,16 @@ class VoiceService {
     }
 
     // --- ACTIVE PROCESSING BELOW ---
-    console.log('Processing active command:', command);
-    this.addToHistory(command);
+    console.log('Processing active command (Raw):', command);
+
+    // Clean command: Remove common prefixes/noise
+    let cleanCommand = command.replace(/^(i'm|i am) listening[.!?]?\s*/i, '').trim();
+    cleanCommand = cleanCommand.replace(/^(system|computer|doctor)[.!?]?\s*/i, '').trim();
+
+    if (!cleanCommand) return; // Ignore if just noise
+
+    console.log('Processing active command (Clean):', cleanCommand);
+    this.addToHistory(cleanCommand);
 
     // 4. Check LOCAL COMMANDS first (Navigation, Help, simple stuff)
     // This makes navigation instant and works even if backend is slow/offline

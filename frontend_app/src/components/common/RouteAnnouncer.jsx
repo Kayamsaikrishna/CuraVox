@@ -29,14 +29,19 @@ const RouteAnnouncer = () => {
             if (!hasWelcomed) {
                 // First time in this session: Play Full Welcome
                 const now = new Date();
-                const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-                const welcomeMsg = `Welcome to CuraVox. Today is ${dateStr}. You are on the Home Page.`;
+                const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                const welcomeMsg = `Welcome to CuraVox. Today is ${dateStr}. You're doing great!`;
 
-                voiceService.speak(welcomeMsg);
-                sessionStorage.setItem('welcomeAnnounced', 'true');
+                // Delay slightly to allow browser audio context to wake up after splash interaction
+                setTimeout(() => {
+                    voiceService.speak(welcomeMsg);
+                    sessionStorage.setItem('welcomeAnnounced', 'true');
+                }, 500);
             } else {
                 // Subsequent visits/refreshes: Short Intro
-                voiceService.speak("You are on the Home Page.");
+                setTimeout(() => {
+                    voiceService.speak("You are on the Home Page.");
+                }, 500);
             }
         }
         // Logic for other pages
