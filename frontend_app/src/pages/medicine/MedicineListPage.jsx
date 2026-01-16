@@ -20,82 +20,13 @@ const MedicineListPage = () => {
   const { speak } = useAccessibility();
 
   useEffect(() => {
-    // Load medicines if not already loaded
+    // Load medicines if not already loaded - checking for empty state to fetch real data
+    // (Real fetch logic would go here, currently we just leave it empty if no backend data)
     if (state.medicines.length === 0) {
-      actions.setLoading('medicines', true);
-      // Simulate loading delay
-      setTimeout(() => {
-        actions.setMedicines([
-          {
-            id: 1,
-            name: "Paracetamol",
-            activeIngredients: ["Paracetamol 500mg"],
-            dosage: "Take 1-2 tablets every 4-6 hours",
-            usage: "As needed for pain or fever. Do not exceed 8 tablets in 24 hours.",
-            sideEffects: ["Nausea", "Stomach pain", "Liver damage if taken in excess"],
-            expiryDate: "2025-12-31",
-            manufacturer: "Generic Pharmaceuticals",
-            category: "Pain Relief",
-            frequency: "As needed",
-            lastTaken: "2024-01-10"
-          },
-          {
-            id: 2,
-            name: "Amoxicillin",
-            activeIngredients: ["Amoxicillin 250mg"],
-            dosage: "Take one capsule three times daily",
-            usage: "For bacterial infection. Complete full course even if feeling better.",
-            sideEffects: ["Diarrhea", "Nausea", "Skin rash"],
-            expiryDate: "2024-10-15",
-            manufacturer: "HealthPlus Labs",
-            category: "Antibiotic",
-            frequency: "Three times daily",
-            lastTaken: "2024-01-10"
-          },
-          {
-            id: 3,
-            name: "Ibuprofen",
-            activeIngredients: ["Ibuprofen 400mg"],
-            dosage: "Take 1 tablet every 6-8 hours",
-            usage: "For pain relief and inflammation. Take with food to avoid stomach upset.",
-            sideEffects: ["Stomach pain", "Heartburn", "Dizziness"],
-            expiryDate: "2025-05-20",
-            manufacturer: "Wellness Pharma",
-            category: "Anti-inflammatory",
-            frequency: "Every 6-8 hours",
-            lastTaken: "2024-01-09"
-          },
-          {
-            id: 4,
-            name: "Metformin",
-            activeIngredients: ["Metformin 500mg"],
-            dosage: "Take one tablet twice daily with meals",
-            usage: "For diabetes management. Take with food to reduce stomach upset.",
-            sideEffects: ["Nausea", "Diarrhea", "Metallic taste"],
-            expiryDate: "2024-08-30",
-            manufacturer: "Diabetes Care Inc",
-            category: "Diabetes",
-            frequency: "Twice daily",
-            lastTaken: "2024-01-10"
-          },
-          {
-            id: 5,
-            name: "Lisinopril",
-            activeIngredients: ["Lisinopril 10mg"],
-            dosage: "Take one tablet daily in the morning",
-            usage: "For blood pressure management. Take at the same time each day.",
-            sideEffects: ["Dizziness", "Dry cough", "Fatigue"],
-            expiryDate: "2025-03-15",
-            manufacturer: "Cardio Health",
-            category: "Blood Pressure",
-            frequency: "Once daily",
-            lastTaken: "2024-01-10"
-          }
-        ]);
-        actions.setLoading('medicines', false);
-      }, 1000);
+      // Formerly injected dummy data here. Now keeps it empty.
+      actions.setLoading('medicines', false);
     }
-  }, [state.medicines, actions]);
+  }, [state.medicines.length, actions]);
 
   const handleSearch = (term) => {
     setSearchTerm(term);
@@ -138,22 +69,22 @@ const MedicineListPage = () => {
 
   // Filter medicines based on search term and filter
   const filteredMedicines = state.medicines.filter(medicine => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       medicine.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (medicine.activeIngredients && 
-       medicine.activeIngredients.some(ingredient => 
-         ingredient.toLowerCase().includes(searchTerm.toLowerCase())
-       )
+      (medicine.activeIngredients &&
+        medicine.activeIngredients.some(ingredient =>
+          ingredient.toLowerCase().includes(searchTerm.toLowerCase())
+        )
       ) ||
       medicine.category.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     let matchesFilter = true;
     if (filter === 'active') {
       matchesFilter = new Date(medicine.expiryDate) > new Date();
     } else if (filter === 'expired') {
       matchesFilter = new Date(medicine.expiryDate) <= new Date();
     }
-    
+
     return matchesSearch && matchesFilter;
   });
 
@@ -181,28 +112,28 @@ const MedicineListPage = () => {
   };
 
   return (
-    <div style={{ 
-      backgroundColor: '#f0f9ff', 
-      minHeight: '100vh', 
+    <div style={{
+      backgroundColor: '#f0f9ff',
+      minHeight: '100vh',
       padding: '20px',
       fontFamily: 'Arial, sans-serif',
       lineHeight: '1.6'
     }}>
       {/* Screen reader announcement area */}
-      <div 
-        aria-live="polite" 
-        aria-atomic="true" 
-        style={{ 
-          position: 'absolute', 
-          left: '-10000px', 
-          width: '1px', 
-          height: '1px', 
-          overflow: 'hidden' 
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: 'absolute',
+          left: '-10000px',
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden'
         }}
       />
 
-      <div style={{ 
-        maxWidth: '1000px', 
+      <div style={{
+        maxWidth: '1000px',
         margin: '0 auto',
         backgroundColor: 'white',
         borderRadius: '8px',
@@ -211,10 +142,10 @@ const MedicineListPage = () => {
         border: '2px solid #3b82f6'
       }}>
         <header style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h1 
-            style={{ 
-              fontSize: '28px', 
-              fontWeight: 'bold', 
+          <h1
+            style={{
+              fontSize: '28px',
+              fontWeight: 'bold',
               color: '#1e40af',
               marginBottom: '10px',
               borderBottom: '3px solid #3b82f6',
@@ -224,9 +155,9 @@ const MedicineListPage = () => {
           >
             My Medicines
           </h1>
-          <p 
-            style={{ 
-              fontSize: '16px', 
+          <p
+            style={{
+              fontSize: '16px',
               color: '#4b5563',
               fontStyle: 'italic'
             }}
@@ -237,17 +168,17 @@ const MedicineListPage = () => {
         </header>
 
         {/* Action Bar */}
-        <div style={{ 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          gap: '15px', 
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '15px',
           marginBottom: '25px',
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
           <div style={{ flex: '1', minWidth: '250px' }}>
-            <Search 
-              placeholder="Search medicines by name, ingredient, or category..." 
+            <Search
+              placeholder="Search medicines by name, ingredient, or category..."
               onSearch={handleSearch}
               style={{ width: '100%', padding: '10px' }}
             />
@@ -271,10 +202,10 @@ const MedicineListPage = () => {
         </div>
 
         {/* Filters and Sorting */}
-        <div style={{ 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          gap: '15px', 
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '15px',
           marginBottom: '25px',
           padding: '15px',
           backgroundColor: '#f0f9ff',
@@ -301,7 +232,7 @@ const MedicineListPage = () => {
               <option value="expired">Expired Medicines</option>
             </select>
           </div>
-          
+
           <div>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', color: '#1e40af' }}>Sort By:</label>
             <select
@@ -322,7 +253,7 @@ const MedicineListPage = () => {
               <option value="dosage">Frequency</option>
             </select>
           </div>
-          
+
           <button
             onClick={toggleInteractionChecker}
             style={{
@@ -340,7 +271,7 @@ const MedicineListPage = () => {
           >
             {showInteractionChecker ? 'Hide' : 'Show'} Interaction Checker
           </button>
-          
+
           <button
             onClick={togglePillGame}
             style={{
@@ -361,9 +292,9 @@ const MedicineListPage = () => {
         </div>
 
         {/* Stats Cards */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '15px',
           marginBottom: '25px'
         }}>
@@ -408,9 +339,9 @@ const MedicineListPage = () => {
             border: '2px solid #8b5cf6',
             borderRadius: '8px'
           }}>
-            <h2 style={{ 
-              fontSize: '20px', 
-              fontWeight: '600', 
+            <h2 style={{
+              fontSize: '20px',
+              fontWeight: '600',
               color: '#7c3aed',
               marginBottom: '15px',
               display: 'flex',
@@ -432,9 +363,9 @@ const MedicineListPage = () => {
             border: '2px solid #4ade80',
             borderRadius: '8px'
           }}>
-            <h2 style={{ 
-              fontSize: '20px', 
-              fontWeight: '600', 
+            <h2 style={{
+              fontSize: '20px',
+              fontWeight: '600',
               color: '#16a34a',
               marginBottom: '15px',
               display: 'flex',
@@ -523,9 +454,9 @@ const MedicineListPage = () => {
               </p>
             </div>
 
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
               gap: '20px',
               marginBottom: '25px'
             }}>
@@ -544,10 +475,10 @@ const MedicineListPage = () => {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
                       <div>
-                        <h3 
-                          style={{ 
-                            fontSize: '18px', 
-                            fontWeight: '600', 
+                        <h3
+                          style={{
+                            fontSize: '18px',
+                            fontWeight: '600',
                             color: isExpired ? '#dc2626' : '#1e40af',
                             marginBottom: '5px'
                           }}
@@ -613,9 +544,9 @@ const MedicineListPage = () => {
                       </p>
                     </div>
 
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '10px', 
+                    <div style={{
+                      display: 'flex',
+                      gap: '10px',
                       flexWrap: 'wrap',
                       paddingTop: '15px',
                       borderTop: '1px solid #e5e7eb'
@@ -637,7 +568,7 @@ const MedicineListPage = () => {
                       >
                         View Details
                       </button>
-                      
+
                       <button
                         onClick={() => handleSetReminder(medicine)}
                         style={{
@@ -664,17 +595,17 @@ const MedicineListPage = () => {
         )}
 
         {/* Emergency Information Section */}
-        <div style={{ 
-          marginTop: '30px', 
-          padding: '20px', 
-          backgroundColor: '#fef2f2', 
+        <div style={{
+          marginTop: '30px',
+          padding: '20px',
+          backgroundColor: '#fef2f2',
           border: '2px solid #fecaca',
-          borderRadius: '8px' 
+          borderRadius: '8px'
         }}>
-          <h3 
-            style={{ 
-              fontSize: '18px', 
-              fontWeight: '600', 
+          <h3
+            style={{
+              fontSize: '18px',
+              fontWeight: '600',
               color: '#b91c1c',
               marginBottom: '15px',
               display: 'flex',
@@ -685,7 +616,7 @@ const MedicineListPage = () => {
             <span style={{ fontSize: '24px', marginRight: '10px' }}>🚨</span>
             Emergency Information
           </h3>
-          <ul style={{ 
+          <ul style={{
             color: '#b91c1c',
             paddingLeft: '20px',
             fontSize: '14px'
@@ -698,17 +629,17 @@ const MedicineListPage = () => {
         </div>
 
         {/* Accessibility Tips */}
-        <div style={{ 
-          marginTop: '20px', 
-          padding: '20px', 
-          backgroundColor: '#e0f2fe', 
+        <div style={{
+          marginTop: '20px',
+          padding: '20px',
+          backgroundColor: '#e0f2fe',
           border: '2px solid #0ea5e9',
-          borderRadius: '8px' 
+          borderRadius: '8px'
         }}>
-          <h3 
-            style={{ 
-              fontSize: '18px', 
-              fontWeight: '600', 
+          <h3
+            style={{
+              fontSize: '18px',
+              fontWeight: '600',
               color: '#0284c7',
               marginBottom: '15px',
               display: 'flex',
@@ -719,7 +650,7 @@ const MedicineListPage = () => {
             <span style={{ fontSize: '24px', marginRight: '10px' }}>ℹ️</span>
             Medicine Management Tips
           </h3>
-          <ul style={{ 
+          <ul style={{
             color: '#0284c7',
             paddingLeft: '20px',
             fontSize: '14px'

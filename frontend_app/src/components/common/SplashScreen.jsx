@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { AnimatePresence, motion } from 'framer-motion';
 import introVideo from '../../assets/Product_Reveal_Video_Generation.mp4';
@@ -32,20 +32,20 @@ const SplashScreen = ({ onComplete }) => {
             if (!videoRef.current) return;
 
             try {
-                // Attempt 1: Play with sound
+                // 1. Try FORCE UNMUTED (What you want)
                 videoRef.current.muted = false;
+                videoRef.current.volume = 1.0;
                 await videoRef.current.play();
-                console.log("Autoplay with sound success");
+                console.log("Audio Autoplay Success");
             } catch (err) {
-                console.warn("Autoplay with sound blocked. Falling back to muted.");
-                // Attempt 2: Fallback to muted (Always works)
+                console.warn("Audio Blocked by Browser -> Fallback to Muted to prevent freezing");
+                // 2. If Blocked, switch to MUTED so video doesn't get stuck
                 if (videoRef.current) {
                     videoRef.current.muted = true;
                     try {
                         await videoRef.current.play();
                     } catch (e) {
-                        console.error("Muted playback failed too", e);
-                        onComplete(); // Force exit if video is totally broken
+                        onComplete(); // Total failure => Skip
                     }
                 }
             }
@@ -53,7 +53,7 @@ const SplashScreen = ({ onComplete }) => {
 
         playVideo();
 
-        // Safety timeout: 10 seconds max (Video duration + buffer)
+        // Safety timeout: 10 seconds max
         const timer = setTimeout(() => {
             onComplete();
         }, 10000);
@@ -61,12 +61,21 @@ const SplashScreen = ({ onComplete }) => {
         return () => clearTimeout(timer);
     }, [onComplete]);
 
+    const handleInteraction = () => {
+        if (videoRef.current) {
+            videoRef.current.muted = false;
+            videoRef.current.volume = 1.0;
+            console.log("User interaction: Unmuting video");
+        }
+    };
+
     return (
         <AnimatePresence>
             <SplashContainer
                 initial={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 1 }}
+                onClick={handleInteraction}
             >
                 <VideoElement
                     ref={videoRef}
