@@ -5,6 +5,7 @@ class VoiceService {
     this.recognition = null;
     this.synthesis = window.speechSynthesis;
     this.isListening = false;
+    this.shouldBeListening = false; // Intention flag
     this.commands = new Map();
     this.commandHistory = [];
     this.initializeVoiceRecognition();
@@ -16,33 +17,65 @@ class VoiceService {
 
     if (SpeechRecognition) {
       this.recognition = new SpeechRecognition();
-      this.recognition.continuous = true;
+      this.recognition.continuous = true; // Keep listening even after silence
       this.recognition.interimResults = false;
       this.recognition.lang = 'en-US';
 
+      this.recognition.onstart = () => {
+        this.isListening = true;
+        window.dispatchEvent(new CustomEvent('voiceStateChange', { detail: { isListening: true } }));
+      };
+
       this.recognition.onresult = (event) => {
+        // Ignore results if the system itself is currently speaking (prevent echo)
+        if (this.synthesis.speaking) return;
+
         const command = event.results[event.results.length - 1][0].transcript.trim();
-        this.processCommand(command);
+        if (command.length > 0) {
+          this.processCommand(command);
+        }
       };
 
       this.recognition.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        this.speak(`Speech recognition error: ${event.error}`);
+        console.warn('Speech recognition error:', event.error);
+
+        // Specific handling for 'no-speech' (common in continuous mode) - just ignore
+        if (event.error === 'no-speech') {
+          return;
+        }
+
+        // For other errors, try to restart after a delay
+        if (event.error !== 'aborted') {
+          this.restartListening();
+        }
       };
 
       this.recognition.onend = () => {
-        if (this.isListening) {
-          setTimeout(() => {
-            if (this.isListening && this.recognition) {
-              this.recognition.start();
-            }
-          }, 100);
+        // ALWAYS restart unless explicitly told to stop (e.g., 'Exit' command)
+        if (this.shouldBeListening) {
+          this.restartListening();
+        } else {
+          this.isListening = false;
+          window.dispatchEvent(new CustomEvent('voiceStateChange', { detail: { isListening: false } }));
         }
       };
     } else {
       console.error('Speech recognition not supported');
       this.speak("Voice control is not supported in your browser. Please use Chrome or Edge.");
     }
+  }
+
+  // Helper to safely restart
+  restartListening() {
+    setTimeout(() => {
+      if (this.recognition && this.shouldBeListening) {
+        try {
+          this.recognition.start();
+        } catch (e) {
+          // Ignore 'already started' errors
+        }
+      }
+    }, 500);
   }
 
   initializeCommands() {
@@ -92,7 +125,6 @@ class VoiceService {
     }
 
     // 2. If it's a complex query or not a simple nav, ASK THE AI BRAIN
-    // This removes the "brute force" keyword matching and lets the LLM/BERT handle it.
     try {
       this.speak("Thinking..."); // Feedback that we are processing
 
@@ -117,6 +149,17 @@ class VoiceService {
 
     } catch (error) {
       console.error("AI processing error:", error);
+
+      if (error.response && error.response.status === 401) {
+        this.speak("Please log in to use AI features.");
+        return;
+      }
+
+      if (error.code === 'ERR_NETWORK') {
+        this.speak("I cannot reach the server. Please check your connection.");
+        return;
+      }
+
       // Fallback to local if AI fails or for offline support
       this.processLocalFallback(command);
     }
@@ -133,7 +176,6 @@ class VoiceService {
         this.navigateTo('/scan');
         break;
       case 'medicine_info':
-        // The info is usually already spoken in 'response', but we could show a modal
         break;
       default:
         console.log("Unknown AI action:", action);
@@ -158,7 +200,6 @@ class VoiceService {
   // Scan functionality
   startScanning() {
     this.speak("Activating camera for medicine scanning");
-    // Trigger camera start event
     window.dispatchEvent(new CustomEvent('voiceCommand', {
       detail: { command: 'startCamera' }
     }));
@@ -213,19 +254,16 @@ class VoiceService {
 
   async getSideEffects(medicine) {
     this.speak(`Checking side effects for ${medicine || 'this medicine'}`);
-    // Implementation would fetch from backend
     this.speak("Common side effects may include nausea, headache, or dizziness. Please consult the medicine leaflet for complete information.");
   }
 
   async getDosage(medicine) {
     this.speak(`Checking dosage information for ${medicine || 'this medicine'}`);
-    // Implementation would fetch from backend
     this.speak("Please follow the dosage instructions on the medicine package or as prescribed by your healthcare provider.");
   }
 
   async getWarnings(medicine) {
     this.speak(`Checking warnings for ${medicine || 'this medicine'}`);
-    // Implementation would fetch from backend
     this.speak("Important warnings: Store in a cool dry place. Keep out of reach of children. Consult your doctor if pregnant or breastfeeding.");
   }
 
@@ -236,44 +274,7 @@ class VoiceService {
     }
 
     this.speak(`Checking for interactions between ${medicines[0]} and ${medicines[1]}`);
-    // Implementation would fetch from backend
     this.speak("No significant interactions found. However, always consult your healthcare provider before combining medications.");
-  }
-
-  // Utility functions
-  startListening() {
-    if (this.recognition && !this.isListening) {
-      try {
-        this.recognition.start();
-        this.isListening = true;
-        this.speak("Voice control activated. I'm listening for your commands.");
-        window.dispatchEvent(new CustomEvent('voiceStateChange', {
-          detail: { isListening: true }
-        }));
-      } catch (error) {
-        console.error('Error starting speech recognition:', error);
-        this.speak("Unable to start voice recognition. Please try again.");
-      }
-    }
-  }
-
-  stopListening() {
-    if (this.recognition && this.isListening) {
-      this.recognition.stop();
-      this.isListening = false;
-      this.speak("Voice control deactivated.");
-      window.dispatchEvent(new CustomEvent('voiceStateChange', {
-        detail: { isListening: false }
-      }));
-    }
-  }
-
-  toggleListening() {
-    if (this.isListening) {
-      this.stopListening();
-    } else {
-      this.startListening();
-    }
   }
 
   speak(text) {
@@ -281,10 +282,20 @@ class VoiceService {
       this.synthesis.cancel();
     }
 
+    // Temporarily stop recognition loop to prevent hearing itself
+    // Note: We don't stop the *service*, just the processing or the recognition engine if needed.
+    // However, stopping/starting engine causes 'bloop' noises in some browsers.
+    // Better strategy: The `onresult` check for `this.synthesis.speaking` handles the logic. 
+    // But for cleaner audio ducking, let's keep it simple.
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
+
+    utterance.onend = () => {
+      // Resume listening focus if needed
+    };
 
     this.synthesis.speak(utterance);
 
@@ -292,6 +303,25 @@ class VoiceService {
     window.dispatchEvent(new CustomEvent('voiceOutput', {
       detail: { text }
     }));
+  }
+
+  // Control Methods
+  startListening() {
+    this.shouldBeListening = true; // User INTENDS to listen
+    if (this.recognition) {
+      try {
+        this.recognition.start();
+      } catch (e) {
+        // Already started
+      }
+    }
+  }
+
+  stopListening() {
+    this.shouldBeListening = false; // User INTENDS to stop
+    if (this.recognition) {
+      this.recognition.stop();
+    }
   }
 
   addToHistory(command) {

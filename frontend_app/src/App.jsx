@@ -39,13 +39,33 @@ const App = () => {
     };
 
     window.addEventListener('keydown', handleKeyDown);
+
+    // Auto-start listening on mount (safety net)
+    voiceService.startListening();
+
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const [showSplash, setShowSplash] = React.useState(true);
+  const [showSplash, setShowSplash] = React.useState(() => {
+    // Only show splash if it hasn't been shown in this session
+    return !sessionStorage.getItem('splashShown');
+  });
+
+  const handleSplashComplete = () => {
+    sessionStorage.setItem('splashShown', 'true');
+    setShowSplash(false);
+    VoiceService.getInstance().startListening();
+  };
+
+  // If splash was already shown, ensure voice is listening on mount
+  useEffect(() => {
+    if (!showSplash) {
+      VoiceService.getInstance().startListening();
+    }
+  }, [showSplash]);
 
   if (showSplash) {
-    return <SplashScreen onComplete={() => setShowSplash(false)} />;
+    return <SplashScreen onComplete={handleSplashComplete} />;
   }
 
   return (
