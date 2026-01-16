@@ -252,6 +252,23 @@ class AdvancedMedicalAI {
       recommendations: []
     };
   }
+  async updateUserProfile(userId, conditions, medications, allergies) {
+    // Store in-memory or send to Python context
+    this.userContext = this.userContext || {};
+    this.userContext[userId] = { conditions, medications, allergies };
+  }
+
+  getPersonalizedResponse(userId, genericResponse) {
+    // If we have context, we could enhance it. For now, passthrough.
+    // In future: Use Gemini or Python to "rewrite" response based on context.
+
+    // Example primitive personalization:
+    // const context = this.userContext?.[userId];
+    // if (context?.allergies?.length > 0) { ... }
+
+    return genericResponse;
+  }
+
   async performStartupCheck() {
     console.log('\n🏥 CuraVox AI Engine: Starting Health Check...');
     try {
