@@ -8,6 +8,7 @@ import RemindersPage from './pages/reminders/RemindersPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import ScanPage from './pages/scan/ScanPage';
+import ConsultationPage from './pages/consultation/ConsultationPage';
 import NotFoundPage from './pages/NotFoundPage';
 // import VoiceControlWidget from './components/common/VoiceControlWidget'; // Removed as requested
 import VoiceService from './services/voiceService';
@@ -17,6 +18,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import PrivateRoute from './components/common/PrivateRoute';
 import SplashScreen from './components/common/SplashScreen';
 import RouteAnnouncer from './components/common/RouteAnnouncer';
+import VoiceNavigator from './components/common/VoiceNavigator';
 
 const App = () => {
   const voiceService = VoiceService.getInstance();
@@ -65,11 +67,21 @@ const App = () => {
     }} />;
   }
 
+  // Fallback: Start voice on any interaction
+  const handleUserInteraction = () => {
+    const vs = VoiceService.getInstance();
+    if (!vs.isListening) {
+      console.log("👆 User interaction detected: Starting Voice Service...");
+      vs.startListening();
+    }
+  };
+
   return (
     <ErrorBoundary>
       <AuthProvider>
         <RouteAnnouncer />
-        <div className="min-h-screen bg-blue-50">
+        <VoiceNavigator />
+        <div className="min-h-screen bg-blue-50" onClick={handleUserInteraction} onTouchStart={handleUserInteraction}>
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage />} />
@@ -109,6 +121,11 @@ const App = () => {
             <Route path="/scan" element={
               <PrivateRoute>
                 <ScanPage />
+              </PrivateRoute>
+            } />
+            <Route path="/consultation" element={
+              <PrivateRoute>
+                <ConsultationPage />
               </PrivateRoute>
             } />
 

@@ -15,10 +15,12 @@ const medicalAIService = new AdvancedMedicalAI();
 const processImageWithOCR = async (imagePath, options = {}) => {
   return new Promise(async (resolve, reject) => {
     try {
-      // 1. TRY GEMINI FLASH FIRST (Cognitive Vision)
-      // Restored this block as User now has an API Key
+      const startTime = Date.now(); // Record start time early for all attempts
+
+      // 1. TRY GEMINI FLASH LITE FIRST (User Request: Fast Vision)
+      // "only for scan and upload medicine i need gemini"
       if (process.env.GEMINI_API_KEY) {
-        console.log("🚀 Using Gemini Vision (Dr. CuraVox) for Analysis...");
+        console.log("🚀 Using Gemini Vision (Cloud) for Analysis...");
         const geminiService = require('./geminiService');
         try {
           // Gemini does OCR + Analysis in one shot
@@ -31,11 +33,11 @@ const processImageWithOCR = async (imagePath, options = {}) => {
               text: geminiResult.extractedText || "Gemini Vision Analysis",
               confidence: (geminiResult.confidence || 0.9) * 100,
               language: 'eng',
-              processingTime: Date.now() - Date.now(), // Approximate
-              engine: 'gemini-2.5-flash',
+              processingTime: Date.now() - startTime,
+              engine: 'gemini-2.5-flash-lite', // Using the specific model we set
               engineVersion: '2.5.0',
               medicineName: geminiResult.medicineName,
-              processedImagePath: imagePath, // No processing needed for Vision AI
+              processedImagePath: imagePath,
               aiAnalysis: {
                 identifiedMedicine: geminiResult.medicineName,
                 confidence: geminiResult.confidence,
@@ -49,10 +51,77 @@ const processImageWithOCR = async (imagePath, options = {}) => {
             return; // EXIT FUNCTION, WE ARE DONE
           }
         } catch (geminiError) {
-          console.error("Gemini failed, falling back to local OCR:", geminiError);
-          // Verify fall through to Tesseract
+          console.error("Gemini failed, falling back to local Vision:", geminiError);
+          // Fall through to Local Gemma
         }
       }
+
+      // 2. FALLBACK: LOCAL GEMMA 3 MULTIMODAL
+      console.log("🚀 Falling back to Local Gemma 3 Vision (Ollama)...");
+
+      const prompt = `
+      Task: VISUAL MEDICINE IDENTIFICATION
+      Analyze this image of a medicine.
+      Return JSON:
+      {
+        "medicineName": "Brand/Generic",
+        "strength": "Dosage",
+        "uses": ["Use 1"],
+        "sideEffects": ["Side Effect 1"],
+        "warnings": ["Warning 1"],
+        "confidence": 0.95
+      }
+      `;
+
+      try {
+        // Call Python Backend which calls Ollama (gemma3:4b)
+        // We pass the raw image path. Python handles base64 encoding.
+        const visionResult = await medicalAIService.callPythonEngine('analyze_medicine_image', {
+          image_path: imagePath,
+          prompt: prompt
+        });
+
+        console.log("🔍 DEBUG: Local Gemma Result:", JSON.stringify(visionResult, null, 2));
+
+        if (visionResult && visionResult.raw_response) {
+          // Parse the JSON from the LLM's raw text response
+          let responseData = {};
+          try {
+            const jsonMatch = visionResult.raw_response.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              responseData = JSON.parse(jsonMatch[0]);
+            } else {
+              responseData = { medicineName: "Unknown (Parse Error)", raw: visionResult.raw_response };
+            }
+          } catch (e) {
+            responseData = { medicineName: "Unknown (JSON Error)", raw: visionResult.raw_response };
+          }
+
+          resolve({
+            text: "Local Vision Analysis (Fallback)",
+            confidence: (visionResult.confidence || 0.8) * 100,
+            language: 'eng',
+            processingTime: Date.now() - startTime,
+            engine: 'gemma3:4b (Local)',
+            engineVersion: 'Ollama',
+            medicineName: responseData.medicineName || "Unknown",
+            processedImagePath: imagePath,
+            aiAnalysis: {
+              identifiedMedicine: responseData.medicineName,
+              confidence: responseData.confidence || visionResult.confidence,
+              dosageInfo: responseData.strength || responseData.dosage,
+              usageInfo: Array.isArray(responseData.uses) ? responseData.uses.join(', ') : responseData.uses,
+              sideEffects: responseData.sideEffects || responseData.side_effects,
+              warnings: responseData.warnings,
+              recommendations: ["Consult a doctor (Local AI Advice)"]
+            }
+          });
+          return; // EXIT FUNCTION
+        }
+      } catch (localError) {
+        console.error("Local Vision also failed, falling back to Tesseract:", localError);
+      }
+
 
       const {
         confidenceThreshold = 80,
@@ -61,8 +130,8 @@ const processImageWithOCR = async (imagePath, options = {}) => {
         language = 'eng'
       } = options;
 
-      // Record start time
-      const startTime = Date.now();
+      // Record start time (already recorded at start of function)
+      // const startTime = Date.now();
 
       // 1. Deep Preprocessing (High-Res Upscale for Small Text)
       // We create a "Scan Ready" version of the image

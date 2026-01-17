@@ -125,38 +125,21 @@ class MedicalAICore:
         Main entry point for Voice Logic.
         Determines intent (Symptom Check vs Medicine Info vs Chat) and routes accordingly.
         """
-        command_lower = command.lower()
+        # --- Simplified Voice Logic: Always be Dr. CuraVox ---
+        # User Feedback: "not responding like doctor ai"
+        # Fix: Route EVERYTHING through the LLM Persona.
+
+        # 1. Check if it's a specific "Analyze This Case" request (explicit trigger)
+        # (Reserved for future "Deep Diagnosis" mode)
+
+        # 2. General Doctor Interaction
+        # Whether it's "What is Paracetamol?" or "I have a headache",
+        # Dr. CuraVox (LLM) handles it best with the persona.
         
-        # --- Intent 1: Medicine Info/Scanning ---
-        if any(w in command_lower for w in ['what is', 'tell me about', 'explain', 'dosage', 'side effects']):
-            # Use NER or basic split to find medicine name
-            medicine_entity = self._extract_entity(command, 'medicine')
-            if medicine_entity:
-                # Route to Medicine Analyzer
-                return {
-                    "action": "medicine_info",
-                    "medicine": medicine_entity,
-                    "response": self.analyze_medicine_from_text(medicine_entity).basic_summary()
-                }
-            else:
-                 # Fallback to LLM if no entity found but intent matches medicine
-                 advice = self.get_medical_advice(command)
-                 return {
-                     "action": "chat",
-                     "response": advice
-                 }
-
-        # --- Intent 2: Symptom Checking ---
-        if any(w in command_lower for w in ['pain', 'hurt', 'feel', 'symptom', 'headache', 'dizzy']):
-            # Route to Agents
-            return {
-                "action": "symptom_check",
-                "response": "I detected a symptom. For a full diagnosis, please describe your symptoms in detail.",
-                # In a real app, this would trigger the agent workflow immediately if symptoms are sufficient
-            }
-
-        # --- Intent 3: General Chat / Fallback ---
+        # Inject user_id context if needed (future feature)
+        # Inject user_id context if needed (future feature)
         advice = self.get_medical_advice(command)
+         
         return {
             "action": "chat",
             "response": advice
@@ -509,23 +492,41 @@ class MedicalAICore:
         
         return min(1.0, overall_confidence)  # Cap at 1.0
     
+    def check_gpu_availability(self) -> str:
+        """Check if NVIDIA GPU is available/detected"""
+        try:
+            # Method 1: Check via nvidia-smi
+            import shutil
+            if shutil.which('nvidia-smi'):
+                 # Could run it to get memory, but presence is enough for "Connected" status
+                 return "DETECTED (NVIDIA)"
+            
+            # Method 2: Check Torch (if installed with CUDA)
+            if torch.cuda.is_available():
+                return f"DETECTED ({torch.cuda.get_device_name(0)})"
+                
+            return "NOT DETECTED"
+        except:
+            return "UNKNOWN"
+
     def get_system_status(self) -> Dict[str, Any]:
         """Get comprehensive system status and statistics"""
-        # Get all installed models from Ollama
-        installed_models = []
-        if hasattr(self.local_llm, 'list_available_models'):
-             installed_models = self.local_llm.list_available_models()
-        
+        # Get System Status - User Requested Clean Output (Only Active Models)
+        active_text_model = self.local_llm.model if hasattr(self.local_llm, 'model') else 'Unknown'
+        active_vision_model = getattr(self.local_llm, 'vision_model', 'None')
+        gpu_status = self.check_gpu_availability()
+
         return {
             'system_initialized': self.system_initialized,
             'llm_available': self.llm_available,
+            'gpu_status': gpu_status,
             'component_health': {
                 'medicine_analyzer': True,
                 'agent_orchestrator': True
             },
             'model_details': {
-                'active_llm': self.local_llm.model_name if hasattr(self.local_llm, 'model_name') else 'medllama2',
-                'installed_llms': installed_models,
+                'active_llm': active_text_model,
+                'active_vision': active_vision_model,
                 'ner': 'dslim/bert-base-NER',
                 'qa': 'deepset/roberta-base-squad2',
                 'summarizer': 'facebook/bart-large-cnn'
@@ -534,151 +535,133 @@ class MedicalAICore:
             'timestamp': datetime.now().isoformat()
         }
 
-def main():
 
-    """
-    Main function to handle command-line interface for Node.js connector
-    """
-    
-    parser = argparse.ArgumentParser(description='Medical AI Core System')
-    parser.add_argument('--input', type=str, help='Input JSON file path')
-    
-    args = parser.parse_args()
-    
-    if not args.input:
-        print(json.dumps({"error": "Input file path required"}), flush=True)
-        return
-    
-    # Read input parameters from file
-    try:
-        with open(args.input, 'r', encoding='utf-8') as f:
-            input_params = json.load(f)
-    except Exception as e:
-        print(json.dumps({"error": f"Failed to read input file: {str(e)}"}), flush=True)
-        return
-    
-    # Initialize the system
-    ai_core = MedicalAICore()
-    
+def process_request(ai_core: MedicalAICore, input_params: Dict[str, Any]) -> Dict[str, Any]:
+    """Unified request processor"""
     try:
         action = input_params.get('action', '')
         
-        if action == 'analyze_patient_case':
-            # Extract parameters
-            symptoms = input_params.get('symptoms', [])
-            patient_context_data = input_params.get('patient_context', {})
-            
-            # Create PatientContext object
-            patient_ctx = PatientContext(**patient_context_data)
-            
-            # Perform analysis (synchronously since this is CLI)
-            result = asyncio.run(ai_core.analyze_patient_case(
-                patient_id=patient_context_data.get('patient_id', 'unknown'),
-                symptoms=symptoms,
-                patient_context=patient_ctx
-            ))
-            
-            # Format result for output
-            output = {
-                'success': True,
-                'action': 'analyze_patient_case',
-                'result': {
-                    'patient_id': result.patient_id,
-                    'symptoms': result.symptoms,
-                    'primary_diagnosis': result.primary_diagnosis,
-                    'differential_diagnoses': result.differential_diagnoses,
-                    'treatment_recommendations': result.treatment_recommendations,
-                    'urgency_level': result.urgency_level,
-                    'confidence_score': result.confidence_score,
-                    'processing_time': result.processing_time,
-                    'timestamp': result.timestamp.isoformat()
-                }
-            }
-            
-        elif action == 'analyze_medicine_text':
-            text = input_params.get('text', '')
-            
-            # Perform medicine analysis
-            medicine_info = ai_core.analyze_medicine_from_text(text)
-            
-            output = {
-                'success': True,
-                'action': 'analyze_medicine_text',
-                'result': {
-                    'name': medicine_info.name,
-                    'generic_name': medicine_info.generic_name,
-                    'uses': medicine_info.uses,
-                    'side_effects': medicine_info.side_effects,
-                    'contraindications': medicine_info.contraindications,
-                    'dosage_instructions': medicine_info.dosage_instructions,
-                    'warnings': medicine_info.warnings,
-                    'storage_instructions': medicine_info.storage_instructions,
-                    'confidence_score': medicine_info.confidence_score
-                }
-            }
+        if action == 'process_voice_command':
+            command = input_params.get('command', '')
+            user_id = input_params.get('user_id', 'unknown')
+            result = ai_core.process_voice_command_intent(command, user_id)
+            return {'success': True, 'result': result}
             
         elif action == 'get_medical_advice':
             query = input_params.get('query', '')
-            patient_context_data = input_params.get('patient_context', None)
-            
-            # Create PatientContext if provided
-            patient_ctx = None
-            if patient_context_data:
-                patient_ctx = PatientContext(**patient_context_data)
-            
-            # Get medical advice
-            advice = ai_core.get_medical_advice(query, patient_ctx)
-            
-            output = {
-                'success': True,
-                'action': 'get_medical_advice',
-                'result': {
-                    'response': advice,
-                    'query': query
-                }
-            }
-            
-        elif action == 'get_system_status':
-            # Get system status
-            status = ai_core.get_system_status()
-            
-            output = {
-                'success': True,
-                'action': 'get_system_status',
-                'result': status
-            }
-            
-        elif action == 'process_voice_command':
-            command = input_params.get('command', '')
-            user_id = input_params.get('user_id', 'unknown')
-            
-            result = ai_core.process_voice_command_intent(command, user_id)
-            
-            output = {
-                'success': True,
-                'action': 'process_voice_command',
-                'result': result
-            }
+            return {'success': True, 'result': {'response': ai_core.get_medical_advice(query), 'query': query}}
 
+        elif action == 'analyze_medicine_text':
+             text = input_params.get('text', '')
+             medicine_info = ai_core.analyze_medicine_from_text(text)
+             return {'success': True, 'result': {
+                 'name': medicine_info.name,
+                 'uses': medicine_info.uses,
+                 'dosage_instructions': medicine_info.dosage_instructions,
+                 'side_effects': medicine_info.side_effects,
+                 'warnings': medicine_info.warnings,
+                 'confidence_score': medicine_info.confidence_score
+             }}
+             
+        elif action == 'analyze_patient_case':
+             symptoms = input_params.get('symptoms', [])
+             patient_context_data = input_params.get('patient_context', {})
+             
+             # Create PatientContext object
+             patient_ctx = PatientContext(**patient_context_data)
+             
+             # Perform analysis (synchronously wrapper around async)
+             result = asyncio.run(ai_core.analyze_patient_case(
+                patient_id=patient_context_data.get('patient_id', 'unknown'),
+                symptoms=symptoms,
+                patient_context=patient_ctx
+             ))
+             
+             return {'success': True, 'result': {
+                 'patient_id': result.patient_id,
+                 'symptoms': result.symptoms,
+                 'primary_diagnosis': result.primary_diagnosis,
+                 'differential_diagnoses': result.differential_diagnoses,
+                 'treatment_recommendations': result.treatment_recommendations,
+                 'urgency_level': result.urgency_level,
+                 'confidence_score': result.confidence_score,
+                 'processing_time': result.processing_time,
+                 'timestamp': result.timestamp.isoformat()
+             }}
+
+        elif action == 'get_system_status':
+             return {'success': True, 'result': ai_core.get_system_status()}
+             
         else:
-            output = {
-                'success': False,
-                'error': f'Unknown action: {action}',
-                'supported_actions': ['analyze_patient_case', 'analyze_medicine_text', 'get_medical_advice', 'get_system_status']
-            }
-    
+             return {'success': False, 'error': f'Unknown action: {action}'}
+
     except Exception as e:
-        output = {
-            'success': False,
-            'error': f'Exception occurred: {str(e)}',
-            'traceback': str(e.__traceback__) if e.__traceback__ else None
-        }
+        logger.error(f"Processing Error: {e}")
+        return {'success': False, 'error': str(e)}
+
+def run_daemon_mode(ai_core: MedicalAICore):
+    """Persistent Loop for Fast Local AI"""
+    logger.info("Daemon Mode Started. Listening on STDIN...")
+    print(json.dumps({"type": "startup", "status": "ready"}), flush=True) # Signal to Node.js
     
-    # Output result as JSON
-    # Output result as JSON
-    print(json.dumps(output), flush=True)
-    sys.stdout.flush()  # Extra insurance
-    # logger.info("Python script finished. Output sent.") # Debug log (stderr)
+    while True:
+        try:
+            line = sys.stdin.readline()
+            if not line:
+                break # EOF
+                
+            line = line.strip()
+            if not line:
+                continue
+                
+            try:
+                data = json.loads(line)
+                request_id = data.get('requestId')
+                
+                # Process
+                response = process_request(ai_core, data)
+                
+                # Attach ID for Node.js correlation
+                if request_id:
+                    response['requestId'] = request_id
+                
+                # Send JSON Line
+                print(json.dumps(response), flush=True)
+                
+            except json.JSONDecodeError:
+                logger.warning("Invalid JSON received")
+                
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            logger.error(f"Daemon Loop Error: {e}")
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input', type=str, help='Input JSON file path (Legacy Mode)')
+    parser.add_argument('--mode', type=str, default='cli', choices=['cli', 'daemon'], help='Operating Mode')
+    args = parser.parse_args()
+
+    # Initialize Core ONCE
+    ai_core = MedicalAICore()
+    
+    if args.mode == 'daemon':
+        run_daemon_mode(ai_core)
+    else:
+        # Legacy File-Based Mode (One-Shot)
+        if not args.input:
+            print(json.dumps({'error': 'Input file required for CLI mode'}), flush=True)
+            return
+            
+        try:
+            with open(args.input, 'r', encoding='utf-8') as f:
+                input_params = json.load(f)
+            
+            result = process_request(ai_core, input_params)
+            print(json.dumps(result), flush=True)
+            
+        except Exception as e:
+            print(json.dumps({'error': str(e)}), flush=True)
 
 if __name__ == "__main__":
     main()

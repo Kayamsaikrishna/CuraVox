@@ -5,64 +5,93 @@ class VoiceService {
     this.recognition = null;
     this.synthesis = window.speechSynthesis;
     this.isListening = false;
-    this.shouldBeListening = false;
-    this.isWakeWordActive = false; // Starts in Passive Mode
+    this.shouldBeListening = true; // DEFAULT: ALLWAYS ON (Mic stays open)
+    this.isWakeWordActive = false; // Starts in Passive Mode (Waiting for "Hello Doctor")
+    this.mode = 'COMMAND_ONLY'; // Options: 'COMMAND_ONLY' | 'CONVERSATIONAL'
     this.commands = new Map();
     this.commandHistory = [];
+    this.retryCount = 0; // Prevent infinite rapid loops
+
     this.initializeVoiceRecognition();
     this.initializeCommands();
+    // Auto-start immediately
+    this.startListening();
+  }
+
+  // Set Mode: 'COMMAND_ONLY' (Global) or 'CONVERSATIONAL' (Page specific)
+  setMode(newMode) {
+    if (['COMMAND_ONLY', 'CONVERSATIONAL'].includes(newMode)) {
+      console.log(`🔄 Voice Mode Switched: ${this.mode} -> ${newMode}`);
+      this.mode = newMode;
+      // In conversational mode, we might want to auto-wake or be more sensitive
+      if (newMode === 'CONVERSATIONAL') {
+        this.isWakeWordActive = true; // Auto-wake when entering consultation
+      }
+    }
   }
 
   initializeVoiceRecognition() {
+    this.speechQueue = [];
+    this.isSpeaking = false;
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (SpeechRecognition) {
       this.recognition = new SpeechRecognition();
-      this.recognition.continuous = true; // Keep listening even after silence
+      this.recognition.continuous = true;
       this.recognition.interimResults = false;
       this.recognition.lang = 'en-US';
 
       this.recognition.onstart = () => {
+        console.log("🎙️ Microphone ACTIVE: Listening for Wake Word...");
         this.isListening = true;
+        this.retryCount = 0;
         window.dispatchEvent(new CustomEvent('voiceStateChange', { detail: { isListening: true } }));
       };
 
       this.recognition.onresult = (event) => {
-        // Ignore results if the system itself is currently speaking (prevent echo)
-        if (this.synthesis.speaking) return;
+        if (this.synthesis.speaking) return; // Don't listen to self
 
-        const command = event.results[event.results.length - 1][0].transcript.trim();
-        if (command.length > 0) {
-          this.processCommand(command);
+        const lastResult = event.results[event.results.length - 1];
+        if (lastResult.isFinal) {
+          const command = lastResult[0].transcript.trim();
+          if (command.length > 0) {
+            this.processCommand(command);
+          }
         }
       };
 
       this.recognition.onerror = (event) => {
         console.warn('Speech recognition error:', event.error);
-
-        // Specific handling for 'no-speech' (common in continuous mode) - just ignore
-        if (event.error === 'no-speech') {
-          return;
-        }
-
-        // For other errors, try to restart after a delay
-        if (event.error !== 'aborted') {
-          this.restartListening();
+        if (event.error === 'not-allowed') {
+          this.speak("Microphone access denied. Please check your browser settings.");
+          this.shouldBeListening = false;
         }
       };
 
       this.recognition.onend = () => {
-        // ALWAYS restart unless explicitly told to stop (e.g., 'Exit' command)
+        // CRITICAL: The browser WILL stop listening after a while or upon silence.
+        // We MUST restart it immediately if we want "Always On".
+        this.isListening = false;
+
+        // Don't restart if we INTENTIONALLY stopped it (e.g. to speak)
+        if (this.shouldSuspendListening) {
+          console.log("⏸️ Microphone paused for speech output...");
+          return;
+        }
+
+        console.log("⚠️ Microphone Stopped. Auto-restarting...");
+
         if (this.shouldBeListening) {
-          this.restartListening();
-        } else {
-          this.isListening = false;
-          window.dispatchEvent(new CustomEvent('voiceStateChange', { detail: { isListening: false } }));
+          // Exponential backoff to prevent browser thrashing if blocked
+          const delay = Math.min(1000 * Math.pow(1.5, this.retryCount), 5000);
+          this.retryCount++;
+          setTimeout(() => this.startListening(), delay);
         }
       };
     } else {
       console.error('Speech recognition not supported');
-      this.speak("Voice control is not supported in your browser. Please use Chrome or Edge.");
+      this.speak("Browser not supported.");
     }
   }
 
@@ -80,124 +109,128 @@ class VoiceService {
   }
 
   initializeCommands() {
-    // Navigation commands
-    this.commands.set('go to home', () => this.navigateTo('/home'));
-    this.commands.set('go to dashboard', () => this.navigateTo('/home'));
-    this.commands.set('go to medicines', () => this.navigateTo('/medicines'));
-    this.commands.set('go to scan', () => this.navigateTo('/scan'));
-    this.commands.set('go to reminders', () => this.navigateTo('/reminders'));
-    this.commands.set('go to profile', () => this.navigateTo('/profile'));
-    this.commands.set('go to settings', () => this.navigateTo('/settings'));
+    // Navigation Map (Key keywords -> Route)
+    this.navMap = {
+      'home': '/home',
+      'dashboard': '/home',
+      'medicines': '/medicines',
+      'medication': '/medicines',
+      'pills': '/medicines',
+      'scan': '/scan',
+      'camera': '/scan',
+      'reminders': '/reminders',
+      'daily': '/reminders',
+      'profile': '/profile',
+      'account': '/profile',
+      'settings': '/settings',
+      'config': '/settings'
+    };
 
-    // Scan commands
+    // Standard Map for precise commands
     this.commands.set('start scanning', () => this.startScanning());
+    this.commands.set('stop scanning', () => this.stopScanning());
     this.commands.set('capture image', () => this.captureImage());
     this.commands.set('upload image', () => this.uploadImage());
-    this.commands.set('stop scanning', () => this.stopScanning());
 
-    // Medicine commands
-    this.commands.set('tell me about', (medicine) => this.tellMeAbout(medicine));
-    this.commands.set('side effects of', (medicine) => this.getSideEffects(medicine));
-    this.commands.set('dosage for', (medicine) => this.getDosage(medicine));
-    this.commands.set('warnings for', (medicine) => this.getWarnings(medicine));
-    this.commands.set('interactions between', (medicines) => this.checkInteractions(medicines));
-
-    // General commands
     this.commands.set('help', () => this.provideHelp());
     this.commands.set('repeat', () => this.repeatLast());
-    this.commands.set('history', () => this.showHistory());
     this.commands.set('clear', () => this.clearResults());
-    this.commands.set('stop listening', () => this.stopListening());
-    this.commands.set('start listening', () => this.startListening());
-    this.commands.set('exit', () => this.exitApplication());
   }
 
   async processCommand(command) {
-    const lowerCommand = command.toLowerCase();
+    if (!command) return;
+    const lowerCommand = command.toLowerCase().trim();
 
-    // 1. Check for WAKE WORD (Easier options)
+    // 1. WAKE WORD CHECK (Always active)
     const wakeWords = ['doctor', 'assistant', 'hello', 'hi', 'start', 'wake up', 'curavox'];
     const isWakeWord = wakeWords.some(word => lowerCommand.includes(word));
 
     if (isWakeWord) {
       this.isWakeWordActive = true;
-      this.speak("I'm listening."); // Shorter, simpler response
-      window.dispatchEvent(new CustomEvent('voiceStateChange', { detail: { isListening: true, isActive: true } }));
-      return;
-    }
-
-    // 2. Check for STOP WORD ("Stop")
-    if (lowerCommand === 'stop' || lowerCommand.includes('stop listening') || lowerCommand.includes('shut up') || lowerCommand.includes('quiet')) {
-      if (this.isWakeWordActive) {
-        this.isWakeWordActive = false;
-        this.speak("Standing by.");
-        window.dispatchEvent(new CustomEvent('voiceStateChange', { detail: { isListening: true, isActive: false } }));
+      if (this.mode === 'COMMAND_ONLY') {
+        this.speechQueue = [];
+        if (this.synthesis.speaking) this.synthesis.cancel();
+        this.speak("I am here.");
+        return;
       }
+    }
+
+    // 2. AGGRESSIVE STOP CHECK (Overrides everything)
+    if (lowerCommand.includes('stop') || lowerCommand.includes('quiet') || lowerCommand.includes('hush') || lowerCommand.includes('cancel')) {
+      this.enterStandbyMode();
+      this.speak("Stopping.");
       return;
     }
 
-    // 3. If NOT active, ignore everything else (Passive Mode)
-    if (!this.isWakeWordActive) {
-      console.log('Ignored (Standby):', command);
+    // 3. INTELLIGENT NAVIGATION & LOCAL COMMANDS (PRIORITY OVER PASSIVE MODE)
+    // "Go home", "Take me to settings", "Open camera" — Always active
+
+
+    // Check Navigation
+    for (const [key, route] of Object.entries(this.navMap)) {
+      if (lowerCommand.includes(key) && (lowerCommand.includes('go') || lowerCommand.includes('open') || lowerCommand.includes('show'))) {
+        console.log(`📍 Fuzzy Nav Match: ${key} -> ${route}`);
+        this.navigateTo(route);
+        return;
+      }
+    }
+
+    // Check Scanning
+    if (lowerCommand.includes('scan') || lowerCommand.includes('camera')) {
+      if (lowerCommand.includes('stop') || lowerCommand.includes('close')) this.stopScanning();
+      else this.startScanning();
       return;
     }
 
-    // --- ACTIVE PROCESSING BELOW ---
-    console.log('Processing active command (Raw):', command);
-
-    // Clean command: Remove common prefixes/noise
-    let cleanCommand = command.replace(/^(i'm|i am) listening[.!?]?\s*/i, '').trim();
-    cleanCommand = cleanCommand.replace(/^(system|computer|doctor)[.!?]?\s*/i, '').trim();
-
-    if (!cleanCommand) return; // Ignore if just noise
-
-    console.log('Processing active command (Clean):', cleanCommand);
-    this.addToHistory(cleanCommand);
-
-    // 4. Check LOCAL COMMANDS first (Navigation, Help, simple stuff)
-    // This makes navigation instant and works even if backend is slow/offline
+    // Check Local Dict (Exact fallback)
     if (this.commands.has(lowerCommand)) {
-      console.log("Executing local command:", lowerCommand);
       this.commands.get(lowerCommand)();
       return;
     }
 
-    // 5. If not local, send to Local AI Backend (Complex queries)
+    // 4. PASSIVE MODE CHECK (For CHAT Only)
+    // If we didn't match a command, and we are in COMMAND_ONLY mode without wake word, IGNORE.
+    if (!this.isWakeWordActive && this.mode === 'COMMAND_ONLY') {
+      return;
+    }
+
+    console.log(`⚡ Processing (${this.mode}):`, command);
+    this.addToHistory(command);
+
+    // 5. MODE SPECIFIC HANDLING
+    if (this.mode === 'COMMAND_ONLY') {
+      console.log("Ignored complex query in Command Mode:", lowerCommand);
+      return;
+    }
+
+    // 6. CONVERSATIONAL MODE: Send to Local AI Backend
     try {
-      // Send to Backend API
+      window.dispatchEvent(new CustomEvent('voiceProcessing', { detail: { isProcessing: true } }));
+
       const response = await api.post('/ai/command', {
         command: command,
         userId: 'user-123'
       });
-      // ... (rest of API handling)
-      const result = response.data;
 
-      // Speak the AI's natural response
-      if (result.response) {
+      const apiResponse = response.data;
+      const result = apiResponse.data || apiResponse.result || apiResponse; // Handle varied formats
+
+      console.log("🗣️ AI Response Received:", result);
+
+      if (result && result.response) {
         this.speak(result.response);
       }
 
-      // Perform any actions
-      if (result.action) {
+      // Fallback if AI sends action even in chat
+      if (result && result.action && result.action !== 'chat') {
         this.handleAIAction(result.action, result.data);
       }
+
     } catch (error) {
-      // ... (error handling)
-      console.error("AI processing error:", error);
-
-      if (error.response && error.response.status === 401) {
-        this.speak("Please log in to use AI features.");
-        return;
-      }
-
-      if (error.code === 'ERR_NETWORK') {
-        this.speak("I cannot reach the server. Please check your connection.");
-        return;
-      }
-
-      // Fallback logic not really needed if we checked local commands first, 
-      // but good safety net for partial matches
-      this.processLocalFallback(command);
+      console.error("AI error:", error);
+      this.speak("I'm having trouble thinking.");
+    } finally {
+      window.dispatchEvent(new CustomEvent('voiceProcessing', { detail: { isProcessing: false } }));
     }
   }
 
@@ -229,7 +262,10 @@ class VoiceService {
 
   // Navigation
   navigateTo(path) {
-    window.location.hash = `#${path}`;
+    console.log("🧭 Requesting Navigation:", path);
+    window.dispatchEvent(new CustomEvent('voiceNavigate', {
+      detail: { path: path }
+    }));
     this.speak(`Navigating to ${path.replace('/', '')} page`);
   }
 
@@ -313,51 +349,131 @@ class VoiceService {
     this.speak("No significant interactions found. However, always consult your healthcare provider before combining medications.");
   }
 
+  // Assuming this is part of the constructor or an initialization method
+  // For the purpose of this edit, we'll place it here as instructed.
+  // In a real application, `speechQueue` and `isSpeaking` would be initialized in the constructor.
+  // The `SpeechRecognition` setup would also typically be in the constructor or a dedicated init method.
+
+
   speak(text) {
+    if (!text) return;
+    console.log("🔊 Queueing Speech:", text);
+    this.speechQueue.push(text);
+    this.processSpeechQueue();
+  }
+
+  processSpeechQueue() {
+    if (this.isSpeaking || this.speechQueue.length === 0) return;
+
+    this.isSpeaking = true;
+    const text = this.speechQueue.shift();
+    console.log("🗣️ Speaking Now:", text);
+
+    // CRITICAL: DISABLE LISTENING TO PREVENT SELF-LOOP
+    this.shouldSuspendListening = true; // Flag to prevent auto-restart in onend
+    if (this.recognition) {
+      try {
+        this.recognition.abort(); // Hard stop immediately
+        this.isListening = false;
+      } catch (e) { }
+    }
+
+    if (!this.synthesis || !window.speechSynthesis) {
+      console.error("❌ SpeechSynthesis API is NOT available.");
+      this.isSpeaking = false;
+      this.shouldSuspendListening = false;
+      if (this.shouldBeListening) this.startListening();
+      return;
+    }
+
+    // Cancel anything currently causing issues (safety net)
     if (this.synthesis.speaking) {
       this.synthesis.cancel();
     }
-
-    // Temporarily stop recognition loop to prevent hearing itself
-    // Note: We don't stop the *service*, just the processing or the recognition engine if needed.
-    // However, stopping/starting engine causes 'bloop' noises in some browsers.
-    // Better strategy: The `onresult` check for `this.synthesis.speaking` handles the logic. 
-    // But for cleaner audio ducking, let's keep it simple.
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
+    const voices = this.synthesis.getVoices();
+    const preferredVoice = voices.find(v => v.name.includes('Google') && v.name.includes('Female')) || voices[0];
+    if (preferredVoice) utterance.voice = preferredVoice;
+
     utterance.onend = () => {
-      // Resume listening focus if needed
+      console.log("✅ Speech Finished.");
+      this.isSpeaking = false;
+
+      // If queue is empty, we can listen again
+      if (this.speechQueue.length === 0) {
+        this.shouldSuspendListening = false;
+        // Add small delay (debounce) before restarting mic to miss any echo
+        if (this.shouldBeListening) {
+          setTimeout(() => this.startListening(), 500);
+        }
+      } else {
+        // Still have things to say
+        setTimeout(() => this.processSpeechQueue(), 100);
+      }
     };
 
-    this.synthesis.speak(utterance);
+    utterance.onerror = (e) => {
+      console.error("❌ Speech Error:", e);
+      this.isSpeaking = false;
+      this.shouldSuspendListening = false;
+      if (this.speechQueue.length > 0) {
+        this.processSpeechQueue();
+      } else if (this.shouldBeListening) {
+        this.startListening();
+      }
+    };
 
-    // Dispatch event for UI updates
+    try {
+      this.synthesis.speak(utterance);
+    } catch (e) {
+      console.error("❌ Failed to speak:", e);
+      this.isSpeaking = false;
+      this.shouldSuspendListening = false;
+      if (this.shouldBeListening) this.startListening();
+    }
+
+    // Dispatch event
     window.dispatchEvent(new CustomEvent('voiceOutput', {
       detail: { text }
     }));
   }
 
+  enterStandbyMode() {
+    // Silent Pause
+    // this.speak("Pausing now. Say 'Hello Doctor' to wake me up."); 
+    this.isWakeWordActive = false;
+    this.speechQueue = [];
+    if (this.synthesis.speaking) this.synthesis.cancel();
+    window.dispatchEvent(new CustomEvent('voiceStateChange', { detail: { isListening: true, isActive: false } }));
+  }
+
   // Control Methods
   startListening() {
     this.shouldBeListening = true; // User INTENDS to listen
+
+    // Avoid "InvalidStateError" if already started
+    if (this.isListening) return;
+
     if (this.recognition) {
       try {
+        // console.log("🎤 Attempting to START microphone..."); // Reduced spam
         this.recognition.start();
       } catch (e) {
-        // Already started
+        if (e.name !== 'InvalidStateError') {
+          // console.error("⚠️ Microphone Start Failed:", e);
+        }
       }
     }
   }
 
   stopListening() {
-    this.shouldBeListening = false; // User INTENDS to stop
-    if (this.recognition) {
-      this.recognition.stop();
-    }
+    // Legacy support: Just go to standby instead of killing mic
+    this.enterStandbyMode();
   }
 
   addToHistory(command) {

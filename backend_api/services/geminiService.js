@@ -19,9 +19,11 @@ class GeminiService {
     constructor() {
         this.apiKey = process.env.GEMINI_API_KEY;
         this.genAI = this.apiKey ? new GoogleGenerativeAI(this.apiKey) : null;
-        // Verified working model for this user
+
+        // Selected Vision Model: gemini-2.5-flash-lite
+        // Verified available and suitable for efficient image analysis.
         this.model = this.genAI ? this.genAI.getGenerativeModel({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-flash-lite",
             systemInstruction: MEDICAL_SYSTEM_PROMPT
         }) : null;
     }
@@ -57,26 +59,10 @@ class GeminiService {
         ];
 
         try {
-            // First Attempt: Primary Model (2.5 Flash)
             const result = await this.model.generateContent(requestParts);
             return this._parseResponse(await result.response);
         } catch (error) {
-            if (error.status === 503 || error.message.includes("503") || error.message.includes("Overloaded")) {
-                console.warn("⚠️ Gemini 2.5 Overloaded. Switching to Stable Backup (1.5 Flash)...");
-                try {
-                    // Fallback Attempt: Stable Model (1.5 Flash)
-                    const backupModel = this.genAI.getGenerativeModel({
-                        model: "gemini-1.5-flash",
-                        systemInstruction: MEDICAL_SYSTEM_PROMPT
-                    });
-                    const result = await backupModel.generateContent(requestParts);
-                    return this._parseResponse(await result.response);
-                } catch (backupError) {
-                    console.error("❌ Both Cloud Models Failed. Falling back to Local AI.");
-                    return null;
-                }
-            }
-            console.error("Gemini Image Analysis Failed:", error);
+            console.error("Gemma 3 Image Analysis Failed:", error);
             return null;
         }
     }
@@ -108,7 +94,7 @@ class GeminiService {
             const result = await this.model.generateContent(usersPrompt);
             return (await result.response).text();
         } catch (error) {
-            console.error("Gemini Text Generation Failed:", error);
+            console.error("Gemma 3 Text Generation Failed:", error);
             return null;
         }
     }
@@ -138,7 +124,7 @@ class GeminiService {
             const text = (await result.response).text().replace(/```json/g, "").replace(/```/g, "").trim();
             return JSON.parse(text);
         } catch (error) {
-            console.error("Gemini Symptom Analysis Failed:", error);
+            console.error("Gemma 3 Symptom Analysis Failed:", error);
             return null;
         }
     }

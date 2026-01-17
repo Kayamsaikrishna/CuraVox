@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppData } from '../../contexts/AppDataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import useAccessibility from '../../hooks/useAccessibility';
 
 const HomePage = () => {
+  const { logout } = useAuth();
   const { state, actions } = useAppData();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [announcedText, setAnnouncedText] = useState('');
@@ -142,6 +144,16 @@ const HomePage = () => {
       color: "#f59e0b",
       bgColor: "#fef3c7",
       shortcut: "Alt+E"
+    },
+    {
+      id: 5,
+      title: "Consultation",
+      description: "Talk to Dr. CuraVox",
+      icon: "👨‍⚕️",
+      link: "/consultation",
+      color: "#ef4444",
+      bgColor: "#fee2e2",
+      shortcut: "Alt+C"
     }
   ];
 
@@ -265,7 +277,35 @@ const HomePage = () => {
         ref={skipLinkRef}
         tabIndex="-1"
       >
-        <header style={{ textAlign: 'center', marginBottom: '30px' }}>
+        <header style={{
+          textAlign: 'center',
+          marginBottom: '30px',
+          position: 'relative' // For absolute positioning of logout
+        }}>
+          <button
+            onClick={() => {
+              announce('Logging out');
+              logout();
+            }}
+            style={{
+              position: 'absolute',
+              top: '0',
+              right: '0',
+              padding: '8px 16px',
+              backgroundColor: '#ef4444', // Red-500
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              fontSize: '14px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+            aria-label="Log out of application"
+          >
+            Logout
+          </button>
+
           <h1
             style={{
               fontSize: '36px',

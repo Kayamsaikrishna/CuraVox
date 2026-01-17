@@ -42,29 +42,35 @@ class LocalMedicalLLM:
         """Dynamically select the best available model from Ollama"""
         try:
             available_models = self.list_available_models()
-            print(f"Found available models: {available_models}")
+            # print(f"Found available models: {available_models}") # DISABLED: Breaks JSON Protocol
             
-            # Priority list of models to use
-            # Priority list of models to use - 'medllama2' is the specific Medical AI model we need.
+            # Priority list for DEFAULT TEXT GENERATION (Dr. CuraVox Persona)
+            # User Preference: medllama2 for text responses.
             priority_models = [
-                "medllama2",       # PRIMARY: Medical-finetuned Llama2
-                "llama3-medical",  # Future-proof
-                "llama3.2",        # Good general purpose fallback
-                "mistral"          # Lightweight fallback
+                "medllama2",       # PRIMARY TEXT: Deep medical knowledge
+                "llama2-medical",  # Fallback 1
+                "llama3-medical",  # Fallback 2
+                "mistral",
+                "llama3.2",
+                "gemma3:4b"        # Fallback for text (Vision Primary)
             ]
+            
+            # Dedicated Vision Model (Hardcoded usage later)
+            self.vision_model = "gemma3:4b"
             
             for model in priority_models:
                 if model in available_models:
-                    print(f"Selected model: {model}")
+                    # print(f"Selected model: {model}") # DISABLED
                     return model
             
             # If none of the priority models are found, pick the first available one
             if available_models:
-                print(f"No priority model found. Defaulting to: {available_models[0]}")
+                # print(f"No priority model found. Defaulting to: {available_models[0]}") # DISABLED
                 return available_models[0]
                 
         except Exception as e:
-            print(f"Error selecting model: {e}")
+            # print(f"Error selecting model: {e}") # DISABLED
+            pass
             
         return "llama2-medical"  # Fallback
         
@@ -94,14 +100,17 @@ class LocalMedicalLLM:
         """
         start_time = time.time()
         
-        # Construct the full prompt with medical context
         full_prompt = f"""
-        System: You are Dr. CuraVox, an empathetic and professional medical AI assistant.
-        Instructions: 
-        1. Speak naturally like a human doctor (concise, warm, professional).
-        2. Do NOT use markdown or lists unless absolutely necessary. Keep it conversational.
-        3. Start directly with the answer. Do not say "Based on the context".
-        4. If it's an emergency, briefly warn and advise professional care.
+        System: You are Dr. CuraVox, an empathetic and professional medical consultant.
+        
+        Mission: Provide helpful, accurate medical insights while remaining concise.
+        
+        Guidelines:
+        1. **Be Helpful**: Offer general medical information and home care tips for common issues (e.g., fever, cold). Use standard disclaimers naturally.
+        2. **Tone**: Warm, professional, and reassuring. Speak like a human doctor, not a database.
+        3. **Conciseness**: Keep answers under 3-4 sentences. Avoid unnecessary filler.
+        4. **Prohibitions**: Never say "As an AI language model". Never start with "Based on the context".
+        5. **Emergency**: If symptoms seem critical (chest pain, difficulty breathing), urgently advise ER.
         
         Context: {context}
         
@@ -129,9 +138,11 @@ class LocalMedicalLLM:
                     "prompt": full_prompt,
                     "stream": False,
                     "options": {
-                        "temperature": 0.3,  # Lower temperature for more factual responses
+                        "temperature": 0.3,  
                         "top_p": 0.9,
-                        "max_tokens": 500
+                        "max_tokens": 250,
+                        "num_gpu": 99,       # FORCE GPU OFFLOAD (All layers)
+                        "num_ctx": 4096      # Fit in 8GB VRAM comfortably
                     }
                 },
                 timeout=self.timeout
@@ -334,6 +345,80 @@ class LocalMedicalLLM:
         """
         
         return self.generate_medical_response(prompt)
+
+    def generate_image_response(self, image_path: str, prompt: str) -> LLMResponse:
+        """
+        Generate a response based on an image using a multimodal local model (Gemma 3)
+        """
+        import base64
+        
+        start_time = time.time()
+        
+        # Ensure we use a vision model
+        vision_model = getattr(self, "vision_model", "gemma3:4b")
+        if not self.check_model_availability(vision_model):
+             # Try to see if current model is vision capable (e.g. if we fell back to gemma3)
+             if "gemma3" in self.model or "llava" in self.model:
+                 vision_model = self.model
+             else:
+                 return LLMResponse(
+                    response=f"Vision model ({vision_model}) not found locally. Please run 'ollama pull {vision_model}'",
+                    confidence=0.0,
+                    processing_time=0.0,
+                    model_used="none",
+                    tokens_used=0
+                )
+
+        try:
+            with open(image_path, "rb") as img_file:
+                base64_image = base64.b64encode(img_file.read()).decode('utf-8')
+                
+            # Ollama API Format for Multimodal
+            payload = {
+                "model": vision_model,
+                "prompt": prompt,
+                "images": [base64_image],
+                "stream": False,
+                "options": {
+                    "temperature": 0.2, # Low temp for accurate OCR
+                    "num_ctx": 4096     # Ensure context fits
+                }
+            }
+            
+            response = requests.post(
+                f"{self.host}/api/generate",
+                json=payload,
+                timeout=120 # Vision can take longer (Initial Load)
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                processing_time = time.time() - start_time
+                confidence = self._calculate_confidence(result, processing_time)
+                
+                return LLMResponse(
+                    response=result.get("response", ""),
+                    confidence=confidence,
+                    processing_time=processing_time,
+                    model_used=vision_model,
+                    tokens_used=len(result.get("response", "").split())
+                )
+            else:
+                 return LLMResponse(
+                    response=f"Vision analysis failed: {response.text}",
+                    confidence=0.0,
+                    processing_time=time.time() - start_time,
+                    model_used=vision_model,
+                    tokens_used=0
+                )
+        except Exception as e:
+            return LLMResponse(
+                response=f"Error processing image: {str(e)}",
+                confidence=0.0,
+                processing_time=time.time() - start_time,
+                model_used="error",
+                tokens_used=0
+            )
 
 # Example usage
 if __name__ == "__main__":
