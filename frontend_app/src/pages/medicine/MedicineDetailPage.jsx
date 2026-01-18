@@ -1,817 +1,278 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppData } from '../../contexts/AppDataContext';
 import useAccessibility from '../../hooks/useAccessibility';
 import MedicineInteractionChecker from '../../components/medicine/MedicineInteractionChecker';
 
+// --- Ultra-Prism Icons ---
+const IconBack = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+);
+const IconPill = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /><path d="m8.5 8.5 7 7" /></svg>
+);
+const IconShield = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+);
+const IconAlert = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+);
+const IconSync = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" /><path d="M16 16h5v5" /></svg>
+);
+
 const MedicineDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { state, actions } = useAppData();
-  const [medicine, setMedicine] = useState(null);
-  const [activeTab, setActiveTab] = useState('info');
-  const [announcedText, setAnnouncedText] = useState('');
   const { speak } = useAccessibility();
   const mainRef = useRef(null);
 
+  const [medicine, setMedicine] = useState(null);
+  const [activeTab, setActiveTab] = useState('info');
+
   useEffect(() => {
-    // Focus main content area for screen readers
-    if (mainRef.current) {
-      mainRef.current.focus();
-    }
+    if (mainRef.current) mainRef.current.focus();
 
-    // Find the medicine based on the ID from URL
-    const foundMedicine = state.medicines.find(med => med.id === parseInt(id));
-    if (foundMedicine) {
-      setMedicine(foundMedicine);
-      setAnnouncedText(`Viewing details for ${foundMedicine.name}`);
-      speak(`Viewing details for ${foundMedicine.name}. Category: ${foundMedicine.category}. Dosage: ${foundMedicine.dosage}`);
+    const found = state.medicines.find(med => med.id === parseInt(id));
+    if (found) {
+      setMedicine(found);
+      speak(`Viewing details for ${found.name}. Category: ${found.category}.`);
     } else {
-      // If not found, redirect to medicine list or show error
-      speak('Medicine not found. Redirecting to medicine list.');
-      setTimeout(() => {
-        window.location.hash = '#/medicines';
-      }, 2000);
+      speak('Medicine not found. Returning to vault.');
+      setTimeout(() => navigate('/medicines'), 2000);
     }
-  }, [id, state.medicines, speak]);
-
-  // Function to announce section details for screen readers
-  const announceSectionDetails = (section) => {
-    const sectionNames = {
-      info: 'Medicine Information',
-      usage: 'Usage Instructions',
-      effects: 'Side Effects',
-      interactions: 'Drug Interactions'
-    };
-    setAnnouncedText(`Viewing ${sectionNames[section]} section`);
-    speak(`Viewing ${sectionNames[section]} section`);
-  };
-
-  // Function to handle setting a reminder for this medicine
-  const handleSetReminder = () => {
-    if (medicine) {
-      speak(`Setting reminder for ${medicine.name}. ${medicine.dosage}`);
-      // In a real app, this would set an actual reminder
-      alert(`Reminder set for ${medicine.name}: ${medicine.dosage}`);
-    }
-  };
-
-  // Function to handle updating the medicine
-  const handleUpdateMedicine = (updatedMedicine) => {
-    actions.updateMedicine(updatedMedicine);
-    setMedicine(updatedMedicine);
-    setAnnouncedText('Medicine information updated successfully');
-    speak('Medicine information updated successfully');
-  };
-
-  // Function to handle deleting the medicine
-  const handleDeleteMedicine = () => {
-    if (medicine) {
-      if (window.confirm(`Are you sure you want to delete ${medicine.name}?`)) {
-        actions.removeMedicine(medicine.id);
-        setAnnouncedText(`${medicine.name} deleted successfully`);
-        speak(`${medicine.name} deleted successfully`);
-        setTimeout(() => {
-          window.location.hash = '#/medicines';
-        }, 1000);
-      }
-    }
-  };
+  }, [id, state.medicines]);
 
   if (!medicine) {
     return (
-      <div style={{ 
-        backgroundColor: '#f0f9ff', 
-        minHeight: '100vh', 
-        padding: '20px',
-        fontFamily: 'Arial, sans-serif',
-        lineHeight: '1.6'
-      }}>
-        <div style={{ 
-          maxWidth: '1000px', 
-          margin: '0 auto',
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '30px',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          border: '2px solid #3b82f6'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '40px',
-            textAlign: 'center'
-          }}>
-            <div>
-              <div style={{
-                fontSize: '24px',
-                color: '#3b82f6',
-                marginBottom: '10px'
-              }}>Medicine Not Found</div>
-              <div style={{ color: '#6b7280' }}>The requested medicine could not be found.</div>
-            </div>
-          </div>
-        </div>
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-10">
+        <div className="w-16 h-16 border-8 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div 
-      style={{ 
-        backgroundColor: '#f0f9ff', 
-        minHeight: '100vh', 
-        padding: '20px',
-        fontFamily: 'Arial, sans-serif',
-        lineHeight: '1.6'
-      }}
-      tabIndex="-1"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-screen bg-[#f8fafc] pb-32 font-sans selection:bg-indigo-100 outline-none"
       ref={mainRef}
+      tabIndex="-1"
     >
-      {/* Screen reader announcement area */}
-      <div 
-        aria-live="polite" 
-        aria-atomic="true" 
-        style={{ 
-          position: 'absolute', 
-          left: '-10000px', 
-          width: '1px', 
-          height: '1px', 
-          overflow: 'hidden' 
-        }}
-      >
-        {announcedText}
-      </div>
-
-      <div style={{ 
-        maxWidth: '1000px', 
-        margin: '0 auto',
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        padding: '30px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        border: '2px solid #3b82f6'
-      }}>
-        <header style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h1 
-            style={{ 
-              fontSize: '28px', 
-              fontWeight: 'bold', 
-              color: '#1e40af',
-              marginBottom: '10px',
-              borderBottom: '3px solid #3b82f6',
-              paddingBottom: '10px'
-            }}
-            tabIndex="0"
-          >
-            {medicine.name}
-          </h1>
-          <p 
-            style={{ 
-              fontSize: '16px', 
-              color: '#4b5563',
-              fontStyle: 'italic'
-            }}
-            tabIndex="0"
-          >
-            {medicine.category} • {medicine.manufacturer}
-          </p>
-        </header>
-
-        {/* Action Buttons */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'flex-end', 
-          gap: '15px', 
-          marginBottom: '25px' 
-        }}>
+      <header className="bg-white/80 backdrop-blur-2xl border-b border-slate-200 px-10 py-24 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-50/50 rounded-full blur-[140px] -mr-80 -mt-80"></div>
+        <div className="max-w-6xl mx-auto relative z-10">
           <button
-            onClick={handleSetReminder}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#10b981',
-              color: 'white',
-              border: '2px solid #059669',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '16px'
-            }}
-            tabIndex="0"
+            onClick={() => navigate('/medicines')}
+            className="group flex items-center gap-4 text-indigo-600 font-black text-[11px] uppercase tracking-[0.5em] mb-12 hover:-translate-x-2 transition-transform"
           >
-            Set Reminder
+            <IconBack /> Back to Medicines
           </button>
-          <button
-            onClick={handleDeleteMedicine}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              border: '2px solid #dc2626',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '16px'
-            }}
-            tabIndex="0"
-          >
-            Delete Medicine
-          </button>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '5px', 
-          marginBottom: '25px',
-          borderBottom: '2px solid #d1d5db'
-        }}>
-          <button
-            onClick={() => {
-              setActiveTab('info');
-              announceSectionDetails('info');
-            }}
-            style={{
-              padding: '12px 20px',
-              backgroundColor: activeTab === 'info' ? '#3b82f6' : '#f3f4f6',
-              color: activeTab === 'info' ? 'white' : '#4b5563',
-              border: '1px solid #d1d5db',
-              borderRight: 'none',
-              cursor: 'pointer',
-              fontWeight: '600',
-              borderRadius: '6px 0 0 6px'
-            }}
-            tabIndex="0"
-          >
-            Medicine Info
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('usage');
-              announceSectionDetails('usage');
-            }}
-            style={{
-              padding: '12px 20px',
-              backgroundColor: activeTab === 'usage' ? '#3b82f6' : '#f3f4f6',
-              color: activeTab === 'usage' ? 'white' : '#4b5563',
-              border: '1px solid #d1d5db',
-              cursor: 'pointer',
-              fontWeight: '600'
-            }}
-            tabIndex="0"
-          >
-            Usage Instructions
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('effects');
-              announceSectionDetails('effects');
-            }}
-            style={{
-              padding: '12px 20px',
-              backgroundColor: activeTab === 'effects' ? '#3b82f6' : '#f3f4f6',
-              color: activeTab === 'effects' ? 'white' : '#4b5563',
-              border: '1px solid #d1d5db',
-              cursor: 'pointer',
-              fontWeight: '600'
-            }}
-            tabIndex="0"
-          >
-            Side Effects
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('interactions');
-              announceSectionDetails('interactions');
-            }}
-            style={{
-              padding: '12px 20px',
-              backgroundColor: activeTab === 'interactions' ? '#3b82f6' : '#f3f4f6',
-              color: activeTab === 'interactions' ? 'white' : '#4b5563',
-              border: '1px solid #d1d5db',
-              borderLeft: 'none',
-              cursor: 'pointer',
-              fontWeight: '600',
-              borderRadius: '0 6px 6px 0'
-            }}
-            tabIndex="0"
-          >
-            Drug Interactions
-          </button>
-        </div>
-
-        {/* Medicine Information Section */}
-        {activeTab === 'info' && (
-          <div style={{ 
-            padding: '25px', 
-            backgroundColor: '#f9fafb', 
-            border: '2px solid #d1d5db',
-            borderRadius: '8px',
-            marginBottom: '25px'
-          }}>
-            <h2 
-              style={{ 
-                fontSize: '22px', 
-                fontWeight: '600', 
-                color: '#374151',
-                marginBottom: '20px',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-              tabIndex="0"
-            >
-              <span style={{ fontSize: '28px', marginRight: '10px' }}>💊</span>
-              Medicine Information
-            </h2>
-            
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-              gap: '20px' 
-            }}>
-              <div style={{ marginBottom: '15px' }}>
-                <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px', fontSize: '16px' }}>
-                  Medicine Name:
-                </p>
-                <div 
-                  style={{ 
-                    padding: '10px', 
-                    backgroundColor: 'white', 
-                    border: '2px solid #d1d5db', 
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                  tabIndex="0"
-                >
-                  {medicine.name}
-                </div>
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-12">
+            <div className="flex-1">
+              <div className="flex items-center gap-6 mb-8">
+                <div className="w-3 h-12 bg-indigo-600 rounded-full shadow-[0_0_20px_rgba(79,70,229,0.3)]"></div>
+                <span className="text-[14px] font-black text-indigo-600 uppercase tracking-[0.6em]">{medicine.category}</span>
               </div>
-              
-              <div style={{ marginBottom: '15px' }}>
-                <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px', fontSize: '16px' }}>
-                  Category:
-                </p>
-                <div 
-                  style={{ 
-                    padding: '10px', 
-                    backgroundColor: 'white', 
-                    border: '2px solid #d1d5db', 
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                  tabIndex="0"
-                >
-                  {medicine.category}
-                </div>
-              </div>
-              
-              <div style={{ marginBottom: '15px' }}>
-                <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px', fontSize: '16px' }}>
-                  Manufacturer:
-                </p>
-                <div 
-                  style={{ 
-                    padding: '10px', 
-                    backgroundColor: 'white', 
-                    border: '2px solid #d1d5db', 
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                  tabIndex="0"
-                >
-                  {medicine.manufacturer}
-                </div>
-              </div>
-              
-              <div style={{ marginBottom: '15px' }}>
-                <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px', fontSize: '16px' }}>
-                  Active Ingredients:
-                </p>
-                <div 
-                  style={{ 
-                    padding: '10px', 
-                    backgroundColor: 'white', 
-                    border: '2px solid #d1d5db', 
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                  tabIndex="0"
-                >
-                  {medicine.activeIngredients.join(', ')}
-                </div>
-              </div>
-              
-              <div style={{ marginBottom: '15px' }}>
-                <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px', fontSize: '16px' }}>
-                  Dosage:
-                </p>
-                <div 
-                  style={{ 
-                    padding: '10px', 
-                    backgroundColor: 'white', 
-                    border: '2px solid #d1d5db', 
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                  tabIndex="0"
-                >
-                  {medicine.dosage}
-                </div>
-              </div>
-              
-              <div style={{ marginBottom: '15px' }}>
-                <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px', fontSize: '16px' }}>
-                  Frequency:
-                </p>
-                <div 
-                  style={{ 
-                    padding: '10px', 
-                    backgroundColor: 'white', 
-                    border: '2px solid #d1d5db', 
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                  tabIndex="0"
-                >
-                  {medicine.frequency}
-                </div>
-              </div>
-              
-              <div style={{ marginBottom: '15px' }}>
-                <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px', fontSize: '16px' }}>
-                  Expiry Date:
-                </p>
-                <div 
-                  style={{ 
-                    padding: '10px', 
-                    backgroundColor: 'white', 
-                    border: '2px solid #d1d5db', 
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                  tabIndex="0"
-                >
-                  {new Date(medicine.expiryDate).toLocaleDateString()}
-                </div>
-              </div>
-              
-              <div style={{ marginBottom: '15px' }}>
-                <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px', fontSize: '16px' }}>
-                  Last Taken:
-                </p>
-                <div 
-                  style={{ 
-                    padding: '10px', 
-                    backgroundColor: 'white', 
-                    border: '2px solid #d1d5db', 
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                  tabIndex="0"
-                >
-                  {new Date(medicine.lastTaken).toLocaleDateString()}
-                </div>
-              </div>
+              <h1 className="text-8xl font-black text-[#020617] tracking-tighter leading-[0.85] mb-8">
+                {medicine.name}
+              </h1>
+              <p className="text-2xl text-slate-500 font-bold italic opacity-80 border-l-4 border-indigo-100 pl-8">
+                {medicine.manufacturer} • Medication Details
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <motion.button
+                whileHover={{ scale: 1.05, y: -4 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate('/scan')}
+                className="px-12 py-8 bg-indigo-600 text-white rounded-[3rem] font-black text-[12px] uppercase tracking-[0.4em] shadow-[0_30px_60px_-20px_rgba(79,70,229,0.4)] flex items-center gap-6"
+              >
+                <IconSync /> Update Medicine
+              </motion.button>
+              <button
+                onClick={() => {
+                  if (window.confirm(`Delete ${medicine.name} from vault?`)) {
+                    actions.removeMedicine(medicine.id);
+                    speak(`${medicine.name} deleted.`);
+                    navigate('/medicines');
+                  }
+                }}
+                className="w-24 h-24 rounded-[2.5rem] bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+              >
+                <IconAlert />
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      </header>
 
-        {/* Usage Instructions Section */}
-        {activeTab === 'usage' && (
-          <div style={{ 
-            padding: '25px', 
-            backgroundColor: '#e0f2fe', 
-            border: '2px solid #0ea5e9',
-            borderRadius: '8px',
-            marginBottom: '25px'
-          }}>
-            <h2 
-              style={{ 
-                fontSize: '22px', 
-                fontWeight: '600', 
-                color: '#0284c7',
-                marginBottom: '20px',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-              tabIndex="0"
+      <div className="max-w-6xl mx-auto px-10 mt-16">
+        <div className="flex flex-wrap gap-4 mb-20">
+          {[
+            { id: 'info', label: 'Details', icon: <IconPill /> },
+            { id: 'usage', label: 'Usage', icon: <IconSync /> },
+            { id: 'effects', label: 'Side Effects', icon: <IconAlert /> },
+            { id: 'interactions', label: 'Interactions', icon: <IconShield /> }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); speak(`Switching to ${tab.label} section`); }}
+              className={`flex items-center gap-6 px-12 py-7 rounded-[3rem] font-black text-[11px] uppercase tracking-[0.4em] transition-all ${activeTab === tab.id
+                ? 'bg-[#020617] text-white shadow-[0_30px_60px_-15px_rgba(2,6,23,0.3)] scale-105'
+                : 'bg-white text-slate-400 border border-slate-100 hover:border-indigo-200'
+                }`}
             >
-              <span style={{ fontSize: '28px', marginRight: '10px' }}>📝</span>
-              Usage Instructions
-            </h2>
-            
-            <div style={{ marginBottom: '15px' }}>
-              <p style={{ fontWeight: '500', color: '#0284c7', marginBottom: '5px', fontSize: '16px' }}>
-                How to Use:
-              </p>
-              <div 
-                style={{ 
-                  padding: '15px', 
-                  backgroundColor: 'white', 
-                  border: '2px solid #0ea5e9', 
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  lineHeight: '1.8'
-                }}
-                tabIndex="0"
-              >
-                {medicine.usage}
-              </div>
-            </div>
-            
-            <div style={{ marginBottom: '15px' }}>
-              <p style={{ fontWeight: '500', color: '#0284c7', marginBottom: '5px', fontSize: '16px' }}>
-                Important Warnings:
-              </p>
-              <div 
-                style={{ 
-                  padding: '15px', 
-                  backgroundColor: 'white', 
-                  border: '2px solid #0ea5e9', 
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  lineHeight: '1.8'
-                }}
-                tabIndex="0"
-              >
-                {medicine.warnings}
-              </div>
-            </div>
-            
-            <div style={{ marginBottom: '15px' }}>
-              <p style={{ fontWeight: '500', color: '#0284c7', marginBottom: '5px', fontSize: '16px' }}>
-                Storage Instructions:
-              </p>
-              <div 
-                style={{ 
-                  padding: '15px', 
-                  backgroundColor: 'white', 
-                  border: '2px solid #0ea5e9', 
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  lineHeight: '1.8'
-                }}
-                tabIndex="0"
-              >
-                {medicine.storage}
-              </div>
-            </div>
-          </div>
-        )}
+              <div className="scale-90 opacity-80">{tab.icon}</div>
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-        {/* Side Effects Section */}
-        {activeTab === 'effects' && (
-          <div style={{ 
-            padding: '25px', 
-            backgroundColor: '#fef2f2', 
-            border: '2px solid #fecaca',
-            borderRadius: '8px',
-            marginBottom: '25px'
-          }}>
-            <h2 
-              style={{ 
-                fontSize: '22px', 
-                fontWeight: '600', 
-                color: '#b91c1c',
-                marginBottom: '20px',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-              tabIndex="0"
-            >
-              <span style={{ fontSize: '28px', marginRight: '10px' }}>⚠️</span>
-              Side Effects
-            </h2>
-            
-            <div style={{ marginBottom: '15px' }}>
-              <p style={{ fontWeight: '500', color: '#b91c1c', marginBottom: '5px', fontSize: '16px' }}>
-                Common Side Effects:
-              </p>
-              <div 
-                style={{ 
-                  padding: '15px', 
-                  backgroundColor: 'white', 
-                  border: '2px solid #fecaca', 
-                  borderRadius: '6px',
-                  fontSize: '16px'
-                }}
-                tabIndex="0"
-              >
-                <ul style={{ paddingLeft: '20px' }}>
-                  {medicine.sideEffects.map((effect, index) => (
-                    <li key={index} style={{ marginBottom: '8px' }}>{effect}</li>
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-12"
+        >
+          {activeTab === 'info' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+              <div className="lg:col-span-2 bg-white rounded-[4rem] p-16 border border-slate-50 shadow-2xl shadow-slate-100">
+                <h2 className="text-4xl font-black text-[#020617] tracking-tighter mb-12 flex items-center gap-6">
+                  <div className="w-2 h-8 bg-emerald-500 rounded-full"></div>
+                  Medicine Details
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                  {[
+                    { label: 'Dosage', val: medicine.dosage, color: 'text-indigo-600 bg-indigo-50/50' },
+                    { label: 'Frequency', val: medicine.frequency, color: 'text-emerald-600 bg-emerald-50/50' },
+                    { label: 'Ingredients', val: medicine.activeIngredients.join(', '), color: 'text-slate-700 bg-slate-50' },
+                    { label: 'Expiry Date', val: new Date(medicine.expiryDate).toLocaleDateString(), color: 'text-rose-600 bg-rose-50/50' }
+                  ].map((item, i) => (
+                    <div key={i} className="space-y-4">
+                      <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest pl-2">{item.label}</span>
+                      <div className={`p-8 rounded-[2rem] font-black text-xl ${item.color} border border-white shadow-sm`}>
+                        {item.val}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-indigo-600 rounded-[4rem] p-16 text-white shadow-[0_40px_100px_-20px_rgba(79,70,229,0.3)] relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12 scale-150">
+                  <IconShield />
+                </div>
+                <div>
+                  <h3 className="text-4xl font-black tracking-tighter mb-8 leading-none">Safe Storage</h3>
+                  <p className="text-xl text-indigo-100 font-black opacity-80 leading-relaxed italic">Properly stored in your personal vault.</p>
+                </div>
+                <div className="space-y-4 pt-10">
+                  <div className="flex items-center gap-6">
+                    <div className="w-2 h-2 bg-emerald-400 rounded-full shadow-[0_0_15px_rgba(52,211,153,1)]"></div>
+                    <span className="text-[11px] font-black uppercase tracking-widest text-emerald-100">Sync Active</span>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="w-2 h-2 bg-white/30 rounded-full"></div>
+                    <span className="text-[11px] font-black uppercase tracking-widest text-white/50">Medicine Info</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'usage' && (
+            <div className="space-y-12">
+              <div className="bg-white rounded-[4rem] p-16 border border-slate-50 shadow-2xl">
+                <h2 className="text-4xl font-black text-[#020617] tracking-tighter mb-12">How to Use</h2>
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
+                  <div className="lg:col-span-1">
+                    <span className="text-[12px] font-black text-indigo-600 uppercase tracking-widest block mb-4">Direct Insight</span>
+                    <p className="text-2xl font-black text-slate-400 italic">Instructions</p>
+                  </div>
+                  <div className="lg:col-span-3 p-12 bg-indigo-50/30 rounded-[3rem] border-2 border-indigo-100/50 text-3xl font-black text-indigo-900 leading-tight tracking-tight">
+                    {medicine.usage}
+                  </div>
+                </div>
+              </div>
+              <div className="p-16 bg-[#020617] rounded-[4rem] text-white flex flex-col lg:flex-row items-center justify-between gap-12">
+                <div className="flex items-center gap-10">
+                  <div className="w-24 h-24 bg-indigo-600/20 rounded-[2.5rem] flex items-center justify-center text-indigo-500 border border-indigo-900">
+                    <IconSync />
+                  </div>
+                  <div>
+                    <h4 className="text-4xl font-black tracking-tighter">Storage</h4>
+                    <p className="text-indigo-400 text-sm font-black uppercase tracking-[0.5em] mt-3">{medicine.storage}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'effects' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              <div className="bg-white rounded-[4rem] p-16 border border-slate-50 shadow-2xl">
+                <h2 className="text-4xl font-black text-[#020617] tracking-tighter mb-12">Side Effects</h2>
+                <div className="space-y-6">
+                  {medicine.sideEffects.map((ef, i) => (
+                    <div key={i} className="flex items-center gap-8 p-8 bg-slate-50 rounded-[2rem] border border-white group hover:bg-rose-50 transition-colors cursor-default">
+                      <div className="w-3 h-3 rounded-full bg-rose-400 shadow-[0_0_15px_rgba(251,113,133,0.5)] group-hover:scale-150 transition-transform"></div>
+                      <span className="text-2xl font-black text-slate-700 tracking-tight group-hover:text-rose-900">{ef}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-rose-50/50 rounded-[4rem] p-16 border-l-[16px] border-rose-600">
+                <h2 className="text-4xl font-black text-rose-900 tracking-tighter mb-10">Warning Signs</h2>
+                <p className="text-2xl font-black text-rose-800 opacity-60 mb-12 italic leading-relaxed">Call for help if you have any of these symptoms.</p>
+                <ul className="space-y-6">
+                  {[
+                    "Severe allergic reaction",
+                    "Rapid or irregular heartbeat",
+                    "Shortness of breath or swelling"
+                  ].map((sig, i) => (
+                    <li key={i} className="flex items-start gap-8 group">
+                      <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center text-xs font-black shadow-lg">!</div>
+                      <span className="text-xl font-black text-rose-900 uppercase tracking-widest">{sig}</span>
+                    </li>
                   ))}
                 </ul>
+                <a href="tel:108" className="mt-16 block w-full py-10 bg-rose-600 text-white rounded-[2.5rem] text-center font-black text-[14px] uppercase tracking-[0.6em] shadow-[0_20px_60px_-10px_rgba(225,29,72,0.4)] hover:bg-rose-700 transition-all">Emergency Call: 108</a>
               </div>
             </div>
-            
-            <div style={{ 
-              padding: '15px', 
-              backgroundColor: '#fef2f2', 
-              border: '2px solid #fecaca', 
-              borderRadius: '6px'
-            }}>
-              <h3 style={{ 
-                fontSize: '18px', 
-                fontWeight: '600', 
-                color: '#b91c1c',
-                marginBottom: '10px'
-              }}>
-                When to Seek Medical Attention
-              </h3>
-              <ul style={{ 
-                color: '#b91c1c',
-                paddingLeft: '20px',
-                fontSize: '14px'
-              }}>
-                <li style={{ marginBottom: '8px' }} tabIndex="0">Severe allergic reactions (difficulty breathing, swelling)</li>
-                <li style={{ marginBottom: '8px' }} tabIndex="0">Persistent or severe side effects</li>
-                <li style={{ marginBottom: '8px' }} tabIndex="0">Signs of liver problems (yellowing of skin/eyes)</li>
-                <li style={{ marginBottom: '8px' }} tabIndex="0">Unusual bleeding or bruising</li>
-                <li tabIndex="0">Any concerning symptoms not listed here</li>
-              </ul>
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Drug Interactions Section */}
-        {activeTab === 'interactions' && (
-          <div style={{ 
-            padding: '25px', 
-            backgroundColor: '#f0fdf4', 
-            border: '2px solid #a7f3d0',
-            borderRadius: '8px',
-            marginBottom: '25px'
-          }}>
-            <h2 
-              style={{ 
-                fontSize: '22px', 
-                fontWeight: '600', 
-                color: '#065f46',
-                marginBottom: '20px',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-              tabIndex="0"
-            >
-              <span style={{ fontSize: '28px', marginRight: '10px' }}>🔄</span>
-              Drug Interactions
-            </h2>
-            
-            <div style={{ marginBottom: '20px' }}>
-              <p style={{ 
-                color: '#065f46', 
-                fontSize: '16px', 
-                lineHeight: '1.6',
-                marginBottom: '15px'
-              }} tabIndex="0">
-                {medicine.name} may interact with other medications. Use the interaction checker below to see potential interactions with your other medicines.
-              </p>
-              
-              <MedicineInteractionChecker />
+          {activeTab === 'interactions' && (
+            <div className="bg-white rounded-[4rem] p-16 border border-slate-50 shadow-2xl">
+              <h2 className="text-4xl font-black text-[#020617] tracking-tighter mb-8 italic opacity-60">Medicine Details</h2>
+              <h3 className="text-5xl font-black text-[#020617] tracking-tighter mb-16 max-w-4xl leading-none">Check for Medicine Conflicts</h3>
+              <div className="p-12 bg-indigo-50/30 rounded-[3rem] border-2 border-indigo-100">
+                <MedicineInteractionChecker medicineId={medicine.id} />
+              </div>
             </div>
-            
-            <div style={{ 
-              padding: '15px', 
-              backgroundColor: '#f0fdf4', 
-              border: '2px solid #a7f3d0', 
-              borderRadius: '6px'
-            }}>
-              <h3 style={{ 
-                fontSize: '18px', 
-                fontWeight: '600', 
-                color: '#065f46',
-                marginBottom: '10px'
-              }}>
-                Important Interaction Information
-              </h3>
-              <ul style={{ 
-                color: '#065f46',
-                paddingLeft: '20px',
-                fontSize: '14px'
-              }}>
-                <li style={{ marginBottom: '8px' }} tabIndex="0">Always inform your doctor about all medications you're taking</li>
-                <li style={{ marginBottom: '8px' }} tabIndex="0">Include over-the-counter drugs, vitamins, and supplements</li>
-                <li style={{ marginBottom: '8px' }} tabIndex="0">Some interactions may increase side effects</li>
-                <li style={{ marginBottom: '8px' }} tabIndex="0">Some interactions may reduce effectiveness</li>
-                <li tabIndex="0">Never stop or change medications without consulting your doctor</li>
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {/* Audio Feedback Section */}
-        <div style={{ 
-          padding: '20px', 
-          backgroundColor: '#e0f2fe', 
-          border: '2px solid #0ea5e9',
-          borderRadius: '8px',
-          marginBottom: '20px'
-        }}>
-          <h2 
-            style={{ 
-              fontSize: '18px', 
-              fontWeight: '600', 
-              color: '#0284c7',
-              marginBottom: '15px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-            tabIndex="0"
-          >
-            <span style={{ fontSize: '24px', marginRight: '10px' }}>🔊</span>
-            Audio Information
-          </h2>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => {
-                const info = `Medicine: ${medicine.name}. Category: ${medicine.category}. Dosage: ${medicine.dosage}. Usage: ${medicine.usage}. Side effects include: ${medicine.sideEffects.join(', ')}.`;
-                speak(info);
-              }}
-              style={{
-                padding: '10px 15px',
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: '2px solid #2563eb',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '14px'
-              }}
-              tabIndex="0"
-            >
-              Read Full Details
-            </button>
-            <button
-              onClick={() => speak(`Dosage for ${medicine.name}: ${medicine.dosage}`)}
-              style={{
-                padding: '10px 15px',
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: '2px solid #2563eb',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '14px'
-              }}
-              tabIndex="0"
-            >
-              Read Dosage
-            </button>
-            <button
-              onClick={() => speak(`Usage instructions: ${medicine.usage}`)}
-              style={{
-                padding: '10px 15px',
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: '2px solid #2563eb',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '14px'
-              }}
-              tabIndex="0"
-            >
-              Read Usage
-            </button>
-          </div>
-        </div>
-
-        {/* Emergency Information */}
-        <div style={{ 
-          padding: '20px', 
-          backgroundColor: '#fef2f2', 
-          border: '2px solid #fecaca',
-          borderRadius: '8px' 
-        }}>
-          <h2 
-            style={{ 
-              fontSize: '18px', 
-              fontWeight: '600', 
-              color: '#b91c1c',
-              marginBottom: '15px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-            tabIndex="0"
-          >
-            <span style={{ fontSize: '24px', marginRight: '10px' }}>🚨</span>
-            Emergency Information
-          </h2>
-          <ul style={{ 
-            color: '#b91c1c',
-            paddingLeft: '20px',
-            fontSize: '14px'
-          }}>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">In case of overdose, call emergency services immediately</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">If you experience severe side effects, seek medical attention</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Keep this medicine's information available for emergency responders</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Contact your doctor if you have concerns about this medicine</li>
-            <li tabIndex="0">Always carry a list of your current medications</li>
-          </ul>
-        </div>
+          )}
+        </motion.div>
       </div>
-    </div>
+
+      {/* Persistence Interface */}
+      <div className="fixed bottom-12 right-12 flex flex-col gap-6">
+        <motion.button
+          whileHover={{ scale: 1.1, rotate: 5 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => {
+            const script = `${medicine.name}. Dosage: ${medicine.dosage}. Instruction: ${medicine.usage}. Expiry date: ${medicine.expiryDate}. Call 1-0-8 if you feel unwell.`;
+            speak(script);
+          }}
+          className="w-24 h-24 bg-[#020617] text-white rounded-[2rem] shadow-2xl flex items-center justify-center group relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-indigo-600 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-500"></div>
+          <div className="relative z-10">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M11 5 6 9H2v6h4l5 4V5z" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></svg>
+          </div>
+        </motion.button>
+      </div>
+    </motion.div>
   );
 };
 

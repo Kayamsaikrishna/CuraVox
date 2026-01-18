@@ -3,850 +3,226 @@ import { Link } from 'react-router-dom';
 import { useAppData } from '../../contexts/AppDataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import useAccessibility from '../../hooks/useAccessibility';
+import logo from '../../assets/logo.png';
+
+// --- SVG ICONS (Lucide Style) ---
+const IconScan = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><line x1="7" y1="12" x2="17" y2="12" /></svg>
+);
+const IconPill = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /><path d="m8.5 8.5 7 7" /></svg>
+);
+const IconClock = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+);
+const IconStethoscope = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" /><path d="M8 15v1a6 6 0 0 0 6 6h2a6 6 0 0 0 6-6v-4" /><circle cx="20" cy="10" r="2" /></svg>
+);
+const IconUser = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+);
+const IconSettings = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+);
 
 const HomePage = () => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { state, actions } = useAppData();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [announcedText, setAnnouncedText] = useState('');
-  const [activeSection, setActiveSection] = useState('overview');
   const { speak } = useAccessibility();
   const mainRef = useRef(null);
-  const skipLinkRef = useRef(null);
 
   useEffect(() => {
-    // Focus main content area for screen readers
-    if (mainRef.current) {
-      mainRef.current.focus();
-    }
+    if (mainRef.current) mainRef.current.focus();
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    const refreshTimer = setInterval(() => actions.refreshAll(), 30000);
+    return () => { clearInterval(timer); clearInterval(refreshTimer); };
+  }, []);
 
-    // Timer for clock only
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    // Refresh data periodically
-    const refreshTimer = setInterval(() => {
-      actions.refreshAll();
-    }, 15000);
-
-    return () => {
-      clearInterval(timer);
-      clearInterval(refreshTimer);
-    };
-  }, []); // Empty dependency array for intervals
-
-  // Separate effect for Welcome Message - Run once on mount
   useEffect(() => {
-    // Initial refresh
     actions.refreshAll();
+    const welcome = `CuraVox Clinical Interface active for ${user?.name || 'Authorized User'}.`;
+    setTimeout(() => setAnnouncedText(welcome), 1000);
+  }, [user]);
 
-    // Announce welcome message
-    const now = new Date();
-    const welcomeMessage = `Welcome to CuraVox. Today is ${now.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })}. You're doing great!`;
-
-    // Use a small timeout to ensure voice service is ready
-    setTimeout(() => {
-      setAnnouncedText(welcomeMessage);
-      // speak(welcomeMessage); // Silenced as requested for cleaner refresh experience
-    }, 1000);
-
-  }, []); // Run ONLY once on mount
-
-  // Function to announce text for screen readers
   const announce = (text) => {
     setAnnouncedText(text);
     speak(text);
   };
 
-  // Function to handle keyboard shortcuts
-  const handleKeyDown = (e) => {
-    // Alt + O for overview section
-    if (e.altKey && e.key === 'o') {
-      setActiveSection('overview');
-      const element = document.getElementById('overview-section');
-      if (element) element.focus();
-      announce('Navigated to overview section');
-    }
-    // Alt + Q for quick actions section
-    if (e.altKey && e.key === 'q') {
-      setActiveSection('quick-actions');
-      const element = document.getElementById('quick-actions-section');
-      if (element) element.focus();
-      announce('Navigated to quick actions section');
-    }
-    // Alt + R for reminders section
-    if (e.altKey && e.key === 'r') {
-      setActiveSection('reminders');
-      const element = document.getElementById('reminders-section');
-      if (element) element.focus();
-      announce('Navigated to reminders section');
-    }
-    // Alt + E for emergency section
-    if (e.altKey && e.key === 'e') {
-      setActiveSection('emergency');
-      const element = document.getElementById('emergency-section');
-      if (element) element.focus();
-      announce('Navigated to emergency information section');
-    }
-  };
-
-  // Skip to main content function
-  const skipToMainContent = () => {
-    if (skipLinkRef.current) {
-      skipLinkRef.current.focus();
-    }
-  };
-
-  // Quick action cards data
-  const quickActions = [
-    {
-      id: 1,
-      title: "Scan Medicine",
-      description: "Use camera to scan medicine packages",
-      icon: "📷",
-      link: "/scan",
-      color: "#3b82f6",
-      bgColor: "#dbeafe",
-      shortcut: "Alt+S"
-    },
-    {
-      id: 2,
-      title: "My Medicines",
-      description: "View and manage your medicines",
-      icon: "💊",
-      link: "/medicines",
-      color: "#10b981",
-      bgColor: "#dcfce7",
-      shortcut: "Alt+M"
-    },
-    {
-      id: 3,
-      title: "Medication Reminders",
-      description: "Set and manage your medication schedule",
-      icon: "⏰",
-      link: "/reminders",
-      color: "#8b5cf6",
-      bgColor: "#ede9fe",
-      shortcut: "Alt+R"
-    },
-    {
-      id: 4,
-      title: "Settings",
-      description: "Customize accessibility preferences",
-      icon: "⚙️",
-      link: "/settings",
-      color: "#f59e0b",
-      bgColor: "#fef3c7",
-      shortcut: "Alt+E"
-    },
-    {
-      id: 5,
-      title: "My Profile",
-      description: "Manage personal & medical info",
-      icon: "👤",
-      link: "/profile",
-      color: "#6366f1",
-      bgColor: "#e0e7ff",
-      shortcut: "Alt+P"
-    },
-    {
-      id: 6,
-      title: "Consultation",
-      description: "Talk to Dr. CuraVox",
-      icon: "👨‍⚕️",
-      link: "/consultation",
-      color: "#ef4444",
-      bgColor: "#fee2e2",
-      shortcut: "Alt+C"
-    }
+  const services = [
+    { title: "AI Diagnostics", desc: "Advanced medicine analysis", icon: <IconScan />, link: "/scan", theme: "teal" },
+    { title: "Medication Vault", desc: "Your clinical history", icon: <IconPill />, link: "/medicines", theme: "indigo" },
+    { title: "Precision Schedule", desc: "Treatment time-lining", icon: <IconClock />, link: "/reminders", theme: "teal" },
+    { title: "Clinical Support", desc: "Live AI consultation", icon: <IconStethoscope />, link: "/consultation", theme: "indigo" },
+    { title: "Patient Profile", desc: "Records & medical ID", icon: <IconUser />, link: "/profile", theme: "teal" },
+    { title: "System Overhaul", desc: "Core interface config", icon: <IconSettings />, link: "/settings", theme: "indigo" }
   ];
-
-  // Stats cards data
-  const statsCards = [
-    {
-      id: 1,
-      title: "Medicines",
-      value: state.stats.medicines,
-      color: "#1e40af",
-      bgColor: "#dbeafe",
-      description: "Total medicines in your collection"
-    },
-    {
-      id: 2,
-      title: "Active Reminders",
-      value: state.stats.activeReminders,
-      color: "#16a34a",
-      bgColor: "#dcfce7",
-      description: "Currently active medication reminders"
-    },
-    {
-      id: 3,
-      title: "Today's Doses",
-      value: state.stats.dosesToday,
-      color: "#ea580c",
-      bgColor: "#fed7aa",
-      description: "Scheduled doses for today"
-    },
-    {
-      id: 4,
-      title: "Expired",
-      value: state.stats.expired,
-      color: "#be185d",
-      bgColor: "#fbcfe8",
-      description: "Medicines that have expired"
-    }
-  ];
-
-  // Get upcoming reminders from state
-  const upcomingReminders = state.reminders.filter(reminder =>
-    reminder.isActive &&
-    new Date(reminder.nextDue) > new Date()
-  );
 
   return (
-    <div
-      style={{
-        backgroundColor: '#f0f9ff',
-        minHeight: '100vh',
-        padding: '20px',
-        fontFamily: 'Arial, sans-serif',
-        lineHeight: '1.6'
-      }}
-      onKeyDown={handleKeyDown}
-      tabIndex="-1"
-      ref={mainRef}
-    >
-      {/* Skip link for screen readers */}
-      <a
-        href="#main-content"
-        onClick={skipToMainContent}
-        style={{
-          position: 'absolute',
-          left: '-10000px',
-          width: '1px',
-          height: '1px',
-          overflow: 'hidden',
-          zIndex: 1000
-        }}
-        onFocus={(e) => {
-          e.target.style.position = 'fixed';
-          e.target.style.top = '10px';
-          e.target.style.left = '10px';
-          e.target.style.width = 'auto';
-          e.target.style.height = 'auto';
-          e.target.style.overflow = 'visible';
-          e.target.style.backgroundColor = '#3b82f6';
-          e.target.style.color = 'white';
-          e.target.style.padding = '10px';
-          e.target.style.borderRadius = '4px';
-          e.target.style.zIndex = 1000;
-        }}
-        onBlur={(e) => {
-          e.target.style.position = 'absolute';
-          e.target.style.left = '-10000px';
-          e.target.style.width = '1px';
-          e.target.style.height = '1px';
-          e.target.style.overflow = 'hidden';
-        }}
-      >
-        Skip to main content
-      </a>
+    <div className="min-h-screen bg-[#fcfdfd] text-slate-900 pb-24 selection:bg-[#76a04e]/20" ref={mainRef} tabIndex="-1">
+      <div aria-live="polite" className="sr-only">{announcedText}</div>
 
-      {/* Screen reader announcement area */}
-      <div
-        aria-live="assertive"
-        aria-atomic="true"
-        style={{
-          position: 'absolute',
-          left: '-10000px',
-          width: '1px',
-          height: '1px',
-          overflow: 'hidden'
-        }}
-      >
-        {announcedText}
-      </div>
-
-      <div
-        id="main-content"
-        style={{
-          maxWidth: '1000px',
-          margin: '0 auto',
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '30px',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          border: '4px solid #3b82f6'
-        }}
-        ref={skipLinkRef}
-        tabIndex="-1"
-      >
-        <header style={{
-          textAlign: 'center',
-          marginBottom: '30px',
-          position: 'relative' // For absolute positioning of logout
-        }}>
-          <button
-            onClick={() => {
-              announce('Logging out');
-              logout();
-            }}
-            style={{
-              position: 'absolute',
-              top: '0',
-              right: '0',
-              padding: '8px 16px',
-              backgroundColor: '#ef4444', // Red-500
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              fontSize: '14px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-            aria-label="Log out of application"
-          >
-            Logout
-          </button>
-
-          <h1
-            style={{
-              fontSize: '36px',
-              fontWeight: 'bold',
-              color: '#1e40af',
-              marginBottom: '10px',
-              borderBottom: '4px solid #3b82f6',
-              paddingBottom: '10px'
-            }}
-            tabIndex="0"
-          >
-            Medical Assistant
-          </h1>
-          <p
-            style={{
-              fontSize: '22px',
-              color: '#4b5563',
-              marginBottom: '5px'
-            }}
-            tabIndex="0"
-          >
-            {currentTime.toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
-          </p>
-          <p
-            style={{
-              fontSize: '18px',
-              color: '#6b7280'
-            }}
-            tabIndex="0"
-          >
-            {currentTime.toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-          </p>
-        </header>
-
-        {/* Keyboard Shortcuts Info */}
-        <section style={{
-          marginBottom: '25px',
-          padding: '20px',
-          backgroundColor: '#e0f2fe',
-          border: '3px solid #0ea5e9',
-          borderRadius: '8px'
-        }}>
-          <h2
-            style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: '#0284c7',
-              marginBottom: '10px'
-            }}
-            tabIndex="0"
-          >
-            Keyboard Shortcuts:
-            <span style={{ fontSize: '16px', fontWeight: 'normal', display: 'block', marginTop: '5px' }}>
-              Alt+O (Overview) • Alt+Q (Quick Actions) • Alt+R (Reminders) • Alt+E (Emergency)
-            </span>
-          </h2>
-        </section>
-
-        {/* Stats Cards */}
-        <section
-          id="overview-section"
-          style={{ marginBottom: '30px' }}
-          aria-labelledby="overview-heading"
-          tabIndex="-1"
-        >
-          <h2
-            id="overview-heading"
-            style={{
-              fontSize: '26px',
-              fontWeight: '600',
-              color: '#374151',
-              marginBottom: '20px',
-              borderBottom: '4px solid #60a5fa',
-              paddingBottom: '5px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-            tabIndex="0"
-          >
-            <span style={{ fontSize: '32px', marginRight: '10px' }}>📊</span>
-            Today's Overview
-            <button
-              onClick={() => {
-                setActiveSection('overview');
-                announce('Overview section activated');
-              }}
-              style={{
-                marginLeft: 'auto',
-                padding: '8px 15px',
-                backgroundColor: '#60a5fa',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                cursor: 'pointer'
-              }}
-              tabIndex="0"
-              aria-label="Jump to overview section"
-            >
-              Jump
-            </button>
-          </h2>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: '25px'
-          }}>
-            {statsCards.map((stat) => (
-              <div
-                key={stat.id}
-                role="region"
-                aria-labelledby={`stat-title-${stat.id}`}
-                style={{
-                  padding: '30px',
-                  backgroundColor: stat.bgColor,
-                  border: `4px solid ${stat.color}`,
-                  borderRadius: '12px',
-                  textAlign: 'center',
-                  transition: 'transform 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-              >
-                <div
-                  id={`stat-title-${stat.id}`}
-                  style={{ fontSize: '36px', fontWeight: 'bold', color: stat.color, marginBottom: '12px' }}
-                >
-                  {stat.value}
-                </div>
-                <div style={{ color: stat.color, fontWeight: '600', fontSize: '20px', marginBottom: '8px' }}>
-                  {stat.title}
-                </div>
-                <div style={{ color: stat.color, fontSize: '16px' }}>
-                  {stat.description}
+      {/* Premium Minimalist Header */}
+      <header className="fixed top-0 w-full z-50 bg-white/60 backdrop-blur-md border-b border-white/20 px-10 py-4">
+        <div className="max-w-[1400px] mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-6">
+            <Link to="/" className="flex items-center gap-4 group">
+              <div className="relative">
+                <img
+                  src={logo}
+                  alt="CuraVox Logo"
+                  className="h-10 w-auto object-contain transition-all duration-500 group-hover:scale-105"
+                />
+                <div className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="ai-pulse-dot bg-[#76a04e]"></span>
+                  <span className="ai-pulse-inner bg-[#76a04e]"></span>
                 </div>
               </div>
-            ))}
+              <div className="hidden sm:block border-l-2 border-slate-100 pl-6 py-1">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] leading-none block">System Intelligence Control</span>
+              </div>
+            </Link>
           </div>
-        </section>
 
-        {/* Quick Actions */}
-        <section
-          id="quick-actions-section"
-          style={{ marginBottom: '30px' }}
-          aria-labelledby="quick-actions-heading"
-          tabIndex="-1"
-        >
-          <h2
-            id="quick-actions-heading"
-            style={{
-              fontSize: '26px',
-              fontWeight: '600',
-              color: '#374151',
-              marginBottom: '20px',
-              borderBottom: '4px solid #60a5fa',
-              paddingBottom: '5px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-            tabIndex="0"
-          >
-            <span style={{ fontSize: '32px', marginRight: '10px' }}>⚡</span>
-            Quick Actions
+          <div className="flex items-center gap-10">
+            <div className="hidden lg:block border-l-2 border-slate-100 pl-10 py-1">
+              <p className="text-lg font-black text-slate-900 tabular-nums leading-none mb-1">{currentTime.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' })}</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{currentTime.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+            </div>
             <button
-              onClick={() => {
-                setActiveSection('quick-actions');
-                announce('Quick actions section activated');
-              }}
-              style={{
-                marginLeft: 'auto',
-                padding: '8px 15px',
-                backgroundColor: '#60a5fa',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                cursor: 'pointer'
-              }}
-              tabIndex="0"
-              aria-label="Jump to quick actions section"
+              onClick={logout}
+              className="px-8 py-3.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white hover:bg-rose-600 rounded-2xl transition-all border border-slate-200 hover:border-rose-600 shadow-sm"
             >
-              Jump
+              Log Out
             </button>
-          </h2>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '25px'
-          }}>
-            {quickActions.map(action => (
-              <Link
-                key={action.id}
-                to={action.link}
-                onClick={() => {
-                  announce(`Navigate to ${action.title} page. ${action.description}`);
-                }}
-                style={{
-                  display: 'block',
-                  padding: '35px',
-                  backgroundColor: action.bgColor,
-                  border: `4px solid ${action.color}`,
-                  borderRadius: '12px',
-                  textDecoration: 'none',
-                  color: action.color,
-                  fontWeight: '600',
-                  fontSize: '22px',
-                  textAlign: 'center',
-                  transition: 'all 0.3s',
-                  cursor: 'pointer',
-                  position: 'relative'
-                }}
-                tabIndex="0"
-                role="button"
-                aria-label={`${action.title}. ${action.description}. Press enter to navigate.`}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    announce(`Navigate to ${action.title} page. ${action.description}`);
-                  }
-                }}
-              >
-                <div style={{ fontSize: '44px', marginBottom: '18px' }}>{action.icon}</div>
-                <div>{action.title}</div>
-                <div style={{ fontSize: '18px', fontWeight: 'normal', marginTop: '12px' }}>
-                  {action.description}
-                </div>
-                <div style={{
-                  position: 'absolute',
-                  top: '12px',
-                  right: '12px',
-                  backgroundColor: action.color,
-                  color: 'white',
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}>
-                  {action.shortcut}
-                </div>
-              </Link>
-            ))}
           </div>
-        </section>
+        </div>
+      </header>
 
-        {/* Upcoming Reminders */}
-        <section
-          id="reminders-section"
-          style={{ marginBottom: '30px' }}
-          aria-labelledby="reminders-heading"
-          tabIndex="-1"
-        >
-          <h2
-            id="reminders-heading"
-            style={{
-              fontSize: '26px',
-              fontWeight: '600',
-              color: '#374151',
-              marginBottom: '20px',
-              borderBottom: '4px solid #60a5fa',
-              paddingBottom: '5px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-            tabIndex="0"
-          >
-            <span style={{ fontSize: '32px', marginRight: '10px' }}>🔔</span>
-            Upcoming Reminders
-            <button
-              onClick={() => {
-                setActiveSection('reminders');
-                announce('Reminders section activated');
-              }}
-              style={{
-                marginLeft: 'auto',
-                padding: '8px 15px',
-                backgroundColor: '#60a5fa',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                cursor: 'pointer'
-              }}
-              tabIndex="0"
-              aria-label="Jump to reminders section"
-            >
-              Jump
-            </button>
-          </h2>
+      <main className="max-w-[1400px] mx-auto px-10 pt-40 grid grid-cols-1 lg:grid-cols-12 gap-16">
 
-          {upcomingReminders.length > 0 ? (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr',
-              gap: '25px'
-            }}>
-              {upcomingReminders.map(reminder => (
-                <div
-                  key={reminder.id}
-                  role="article"
-                  aria-labelledby={`reminder-title-${reminder.id}`}
-                  style={{
-                    padding: '30px',
-                    backgroundColor: '#e0f2fe',
-                    border: '4px solid #0ea5e9',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
+        {/* Left Column: Intelligence Center */}
+        <div className="lg:col-span-8 flex flex-col gap-16">
+
+          {/* Clinical Hero Section */}
+          <section className="relative group">
+            <div className="absolute inset-x-0 -top-20 -bottom-20 bg-gradient-to-tr from-[#76a04e]/10 via-white to-[#1a365d]/10 blur-3xl opacity-40"></div>
+            <div className="relative glass-card !p-12 overflow-hidden border-white bg-white/30">
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-8">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#76a04e] animate-pulse"></span>
+                  <span className="text-xs font-black text-[#76a04e] uppercase tracking-[0.3em]">Patient: {user?.name || 'Unidentified'}</span>
+                </div>
+                <h2 className="text-6xl font-black text-slate-900 tracking-tight leading-[1.05]">
+                  Monitoring <span className="text-[#76a04e]">Active</span>.
+                </h2>
+                <p className="text-slate-500 mt-8 text-xl font-semibold leading-relaxed max-w-2xl">
+                  Welcome to your health dashboard. You have <span className="text-slate-900 font-black underline decoration-[#76a04e] decoration-4 underline-offset-8">{state.stats.dosesToday} doses</span> remaining for today.
+                </p>
+                <div className="mt-12 flex items-center gap-6">
+                  <Link to="/scan" className="btn-premium bg-[#1a365d] text-white hover:bg-[#1a365d]/90 hover:shadow-[#1a365d]/20 hover:scale-105 min-w-[240px]">
+                    <IconScan />
+                    <span className="uppercase tracking-[0.2em] text-xs">Begin Diagnostic</span>
+                  </Link>
+                  <Link to="/consultation" className="px-8 py-4 rounded-2xl border-2 border-slate-200 text-slate-900 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-50 transition-all flex items-center gap-3">
+                    <IconStethoscope /> Dr. CuraVox
+                  </Link>
+                </div>
+              </div>
+
+              {/* Decorative Geometric Element */}
+              <div className="absolute top-[-20%] right-[-10%] w-[400px] h-[400px] bg-gradient-to-br from-[#76a04e]/10 to-transparent rounded-full blur-2xl"></div>
+            </div>
+          </section>
+
+          {/* Operational Services Grid */}
+          <section>
+            <div className="flex items-center justify-between mb-10">
+              <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">Operational Services</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {services.map((service, i) => (
+                <Link
+                  key={i}
+                  to={service.link}
+                  className="glass-card !p-8 hover:!bg-white group relative overflow-hidden flex flex-col items-center text-center"
                 >
-                  <div id={`reminder-title-${reminder.id}`}>
-                    <h3 style={{
-                      fontSize: '22px',
-                      fontWeight: '600',
-                      color: '#0284c7',
-                      marginBottom: '10px'
-                    }}>
-                      {reminder.medicineName}
-                    </h3>
-                    <p style={{ color: '#0284c7', fontSize: '18px', marginBottom: '10px' }}>
-                      <strong>Dosage:</strong> {reminder.dosage}
-                    </p>
-                    <p style={{ color: '#0284c7', fontWeight: '600', fontSize: '20px' }}>
-                      <strong>Due Time:</strong> {new Date(reminder.nextDue).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
-                    </p>
+                  <div className={`w-20 h-20 rounded-3xl mb-8 flex items-center justify-center shadow-xl transition-all group-hover:scale-110 group-hover:-translate-y-2 ${service.theme === 'teal' ? 'bg-[#76a04e]/5 text-[#76a04e]' : 'bg-[#1a365d]/5 text-[#1a365d]'}`}>
+                    {service.icon}
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <button
-                      onClick={() => announce(`Reminder for ${reminder.medicineName} at ${new Date(reminder.nextDue).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}. ${reminder.dosage}`)}
-                      style={{
-                        backgroundColor: '#0ea5e9',
-                        color: 'white',
-                        border: '3px solid #0284c7',
-                        borderRadius: '10px',
-                        width: '60px',
-                        height: '60px',
-                        cursor: 'pointer',
-                        fontSize: '24px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                      tabIndex="0"
-                      aria-label={`Read reminder details for ${reminder.medicineName}`}
-                    >
-                      🔊
-                    </button>
-                    <Link
-                      to="/reminders"
-                      style={{
-                        backgroundColor: '#3b82f6',
-                        color: 'white',
-                        border: '3px solid #2563eb',
-                        borderRadius: '10px',
-                        padding: '10px 15px',
-                        fontSize: '16px',
-                        textAlign: 'center',
-                        textDecoration: 'none',
-                        fontWeight: '600'
-                      }}
-                      tabIndex="0"
-                    >
-                      View All
-                    </Link>
-                  </div>
-                </div>
+                  <h4 className="text-xl font-black text-slate-900 tracking-tight group-hover:text-[#76a04e] transition-colors">{service.title}</h4>
+                  <p className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-widest">{service.desc}</p>
+                </Link>
               ))}
             </div>
-          ) : (
-            <div style={{
-              padding: '35px',
-              textAlign: 'center',
-              backgroundColor: '#f9fafb',
-              border: '4px dashed #d1d5db',
-              borderRadius: '12px'
-            }}>
-              <div style={{ fontSize: '22px', color: '#6b7280' }}>No upcoming reminders</div>
-              <p style={{ color: '#6b7280', marginTop: '12px' }}>Set medication reminders in the Reminders section</p>
-              <Link
-                to="/reminders"
-                style={{
-                  display: 'inline-block',
-                  marginTop: '18px',
-                  padding: '15px 28px',
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  border: '3px solid #2563eb',
-                  borderRadius: '10px',
-                  textDecoration: 'none',
-                  fontWeight: '600',
-                  fontSize: '18px'
-                }}
-                tabIndex="0"
-              >
-                Set Reminders
-              </Link>
+          </section>
+        </div>
+
+        {/* Right Column: Telemetry & Protocol */}
+        <div className="lg:col-span-4 flex flex-col gap-16">
+
+          {/* Telemetry Panel */}
+          <section className="glass-card !bg-white !p-10 border-slate-100 shadow-2xl">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300 mb-10 text-center">Treatment Timeline</h3>
+
+            <div className="space-y-10">
+              {state.reminders.length > 0 ? (
+                state.reminders.slice(0, 3).map((reminder, idx) => (
+                  <div key={idx} className="relative pl-10 group">
+                    <div className="absolute left-0 top-1 w-4 h-4 rounded-full border-4 border-[#76a04e] bg-white group-hover:bg-[#76a04e] transition-all"></div>
+                    <div className="flex items-baseline justify-between mb-1">
+                      <p className="text-[10px] font-black text-[#76a04e] uppercase tracking-tighter tabular-nums">
+                        {new Date(reminder.nextDue).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <h4 className="text-lg font-black text-slate-900 leading-tight group-hover:text-[#1a365d] transition-colors">{reminder.medicineName}</h4>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">{reminder.dosage}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-16">
+                  <p className="text-slate-300 text-[10px] font-black uppercase tracking-widest italic">All clear for this cycle</p>
+                </div>
+              )}
             </div>
-          )}
-        </section>
+          </section>
 
-        {/* Accessibility Features */}
-        <section style={{
-          backgroundColor: '#e0f2fe',
-          border: '4px solid #0ea5e9',
-          borderRadius: '12px',
-          padding: '35px',
-          marginBottom: '25px'
-        }}>
-          <h2
-            style={{
-              fontSize: '24px',
-              fontWeight: '600',
-              color: '#0284c7',
-              marginBottom: '18px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-            tabIndex="0"
-          >
-            <span style={{ fontSize: '32px', marginRight: '10px' }}>♿</span>
-            Accessibility Features
-          </h2>
-          <ul style={{
-            color: '#0284c7',
-            paddingLeft: '30px',
-            fontSize: '18px',
-            lineHeight: '1.8'
-          }}>
-            <li style={{ marginBottom: '15px' }} tabIndex="0">
-              <strong>Keyboard Navigation:</strong> Press Tab to move between interactive elements, Enter/Space to activate
-            </li>
-            <li style={{ marginBottom: '15px' }} tabIndex="0">
-              <strong>Screen Reader:</strong> All elements properly labeled with ARIA attributes for optimal screen reader experience
-            </li>
-            <li style={{ marginBottom: '15px' }} tabIndex="0">
-              <strong>High Contrast:</strong> High contrast color scheme with clear visual separation between elements
-            </li>
-            <li style={{ marginBottom: '15px' }} tabIndex="0">
-              <strong>Large Text:</strong> Sufficiently large fonts (minimum 18px) with appropriate spacing for easy reading
-            </li>
-            <li style={{ marginBottom: '15px' }} tabIndex="0">
-              <strong>Focus Indicators:</strong> Clear, visible focus indicators (4px borders) for all interactive elements
-            </li>
-            <li style={{ marginBottom: '15px' }} tabIndex="0">
-              <strong>Audio Feedback:</strong> Audio descriptions available for all important information
-            </li>
-            <li style={{ marginBottom: '15px' }} tabIndex="0">
-              <strong>Keyboard Shortcuts:</strong> Alt+O (Overview), Alt+Q (Quick Actions), Alt+R (Reminders), Alt+E (Emergency)
-            </li>
-            <li tabIndex="0">
-              <strong>Skip Links:</strong> Use skip links to navigate directly to main content sections
-            </li>
-          </ul>
-        </section>
+          {/* Emergency Protocol */}
+          <section className="relative overflow-hidden glass-card border-none !bg-rose-600 text-white shadow-rose-200/50">
+            <div className="relative z-10">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /></svg>
+                </div>
+                <h3 className="text-2xl font-black tracking-tighter">EMERGENCY</h3>
+              </div>
+              <p className="font-bold text-rose-100 mb-10 leading-relaxed text-sm">Initiate immediate contact with clinical emergency services if suffering acute symptoms.</p>
+              <div className="flex flex-col gap-4">
+                <a href="tel:108" className="w-full py-5 rounded-3xl bg-white text-rose-600 text-center font-black text-sm uppercase tracking-[0.3em] hover:scale-105 transition-transform shadow-2xl">Call 1-0-8</a>
+              </div>
+            </div>
+            {/* Visual background noise */}
+            <div className="absolute bottom-[-20%] left-[-20%] w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
+          </section>
+        </div>
+      </main>
 
-        {/* Emergency Information */}
-        {/* Emergency Information */}
-        <section
-          id="emergency-section"
-          style={{
-            padding: '35px',
-            backgroundColor: '#fef2f2',
-            border: '4px solid #fecaca',
-            borderRadius: '12px',
-            marginBottom: '80px' // Add spacing for FAB
-          }}
-          tabIndex="-1"
-        >
-          <h2
-            style={{
-              fontSize: '24px',
-              fontWeight: '600',
-              color: '#b91c1c',
-              marginBottom: '18px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <span style={{ fontSize: '32px', marginRight: '10px' }}>🚑</span>
-            Emergency Information
-          </h2>
-          <div style={{ fontSize: '18px', color: '#b91c1c' }}>
-            <p style={{ marginBottom: '10px' }}>
-              <strong>Emergency Mode:</strong> Say <strong>"Call Emergency"</strong> anytime to dial 108 immediately.
-            </p>
-            <p>
-              You can also press the specialized Red Button below.
-            </p>
-          </div>
-        </section>
-
-        {/* FLOATING EMERGENCY BUTTON */}
-        <button
-          onClick={() => {
-            announce("Calling Emergency Services");
-            window.open('tel:108', '_self');
-          }}
-          style={{
-            position: 'fixed',
-            bottom: '40px',
-            right: '40px',
-            width: '80px',
-            height: '80px',
-            borderRadius: '50%',
-            backgroundColor: '#ef4444',
-            color: 'white',
-            border: '4px solid white',
-            boxShadow: '0 10px 25px rgba(239, 68, 68, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '40px',
-            cursor: 'pointer',
-            zIndex: 9999,
-            transition: 'transform 0.2s'
-          }}
-          aria-label="Call Emergency 108"
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          📞
-        </button>
-      </div>
-    </div >
+      {/* Modern Global Control Hub */}
+      <nav className="fixed bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-4 z-50">
+        <div className="px-8 py-5 bg-slate-900/90 backdrop-blur-3xl rounded-full border border-white/10 shadow-2xl flex items-center gap-10">
+          <Link to="/" className="text-[#76a04e] transition-all hover:scale-125"><IconUser /></Link>
+          <div className="w-px h-6 bg-slate-700"></div>
+          <Link to="/reminders" className="text-slate-500 hover:text-white transition-all hover:scale-125"><IconClock /></Link>
+          <div className="w-px h-6 bg-slate-700"></div>
+          <Link to="/settings" className="text-slate-500 hover:text-white transition-all hover:scale-125"><IconSettings /></Link>
+        </div>
+        <Link to="/scan" className="w-20 h-20 bg-[#76a04e] hover:bg-[#76a04e]/90 text-white rounded-full flex items-center justify-center shadow-2xl shadow-[#76a04e]/40 transition-all active:scale-90 hover:rotate-90">
+          <IconScan />
+        </Link>
+      </nav>
+    </div>
   );
 };
 

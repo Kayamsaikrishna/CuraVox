@@ -23,38 +23,53 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-          <Card className="max-w-2xl w-full p-8 text-center">
-            <div className="text-red-500 text-6xl mb-4">⚠️</div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Application Error</h1>
-            <p className="text-gray-700 mb-6">
-              We encountered an error while loading the application. Our team has been notified.
-            </p>
-            <div className="bg-gray-100 p-4 rounded-lg text-left mb-6">
-              <h3 className="font-semibold text-gray-800 mb-2">Error Details:</h3>
-              <p className="text-sm text-gray-600 font-mono">{this.state.error?.toString()}</p>
+        <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] p-6 font-sans">
+          <div className="max-w-md w-full bg-white rounded-[2rem] border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.05)] p-12 text-center relative overflow-hidden">
+            {/* Minimalist Error Icon */}
+            <div className="mb-8 flex justify-center">
+              <div className="w-20 h-20 rounded-full bg-rose-50 flex items-center justify-center text-rose-500">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+              </div>
             </div>
-            <div className="space-y-3">
-              <Button 
-                variant="primary" 
+
+            <div className="mb-8">
+              <span className="text-[10px] font-black text-rose-400 uppercase tracking-[0.3em] mb-3 block">System Error Detected</span>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-4">Application Exception</h1>
+              <p className="text-slate-500 text-sm font-medium leading-relaxed italic">
+                CuraVox encountered an unexpected synchronization issue. Our diagnostic sensors have logged this event for analysis.
+              </p>
+            </div>
+
+            {/* Subtle Diagnostic Box */}
+            <div className="bg-slate-50 rounded-2xl p-6 mb-10 border border-slate-100 text-left">
+              <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Technical Details:</h3>
+              <p className="text-[11px] text-slate-600 font-mono break-all leading-tight opacity-80">
+                {this.state.error?.toString() || "Unhandled state exception"}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button
                 onClick={() => window.location.reload()}
-                className="w-full"
+                className="w-full py-4 rounded-xl bg-[#1a365d] text-white font-bold text-sm hover:bg-[#1a365d]/90 transition-all active:scale-[0.98] shadow-lg shadow-[#1a365d]/10"
               >
-                Reload Application
-              </Button>
-              <Button 
-                variant="outline" 
+                Restore Session
+              </button>
+              <button
                 onClick={() => {
-                  // Attempt to reset the application state
                   localStorage.clear();
                   sessionStorage.clear();
                   window.location.reload();
                 }}
+                className="w-full py-4 rounded-xl text-slate-400 font-bold text-xs hover:text-slate-900 transition-colors"
               >
-                Clear Cache & Reload
-              </Button>
+                Clear Cache & Reset
+              </button>
             </div>
-          </Card>
+
+            {/* Decorative element */}
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-rose-200 opacity-20"></div>
+          </div>
         </div>
       );
     }

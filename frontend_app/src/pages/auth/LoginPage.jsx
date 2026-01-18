@@ -3,11 +3,12 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import logo from '../../assets/logo.png';
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    email: '', // Changed to email if backend expects email, or keep username
+    email: '',
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -15,10 +16,8 @@ const LoginPage = () => {
   const location = useLocation();
   const { login, isAuthenticated } = useAuth();
 
-  // Get redirect path or default to home
   const from = location.state?.from?.pathname || '/home';
 
-  // Redirect if already logged in
   React.useEffect(() => {
     if (isAuthenticated) {
       navigate('/home', { replace: true });
@@ -35,25 +34,17 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting login form:', formData);
     setIsLoading(true);
 
     try {
-      const result = await login(formData.email, formData.password); // Assuming backend takes email/password
+      const result = await login(formData.email, formData.password);
 
       if (result.success) {
         toast.success('Login successful!');
-        // Speak success
         try {
-          // Import dynamically or assume it's available via context/global if not imported.
-          // Since we can't easily add imports without messing up top of file, let's use the one from props or just use window.speechSynthesis directly as fallback or if possible get it from context.
-          // Wait, App.jsx initializes it but doesn't provide it via Context.
-          // Let's rely on simple window.speechSynthesis for now as a quick fix or try to import VoiceService if possible.
-          // Better: Use VoiceService.
           const { default: VoiceService } = await import('../../services/voiceService');
-          VoiceService.getInstance().speak('Login successful. Redirecting to home.');
-        } catch (e) { console.log('Voice feedback failed', e); }
-
+          VoiceService.getInstance().speak('Login successful.');
+        } catch (e) { }
         navigate(from, { replace: true });
       } else {
         const msg = result.message || 'Login failed.';
@@ -61,7 +52,7 @@ const LoginPage = () => {
         try {
           const { default: VoiceService } = await import('../../services/voiceService');
           VoiceService.getInstance().speak(msg);
-        } catch (e) { console.log('Voice error feedback failed', e); }
+        } catch (e) { }
       }
     } catch (error) {
       const msg = 'An unexpected error occurred.';
@@ -76,109 +67,136 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-            Sign in to your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Or{' '}
-            <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
-              create a new account
-            </Link>
+    <div className="min-h-screen bg-slate-50 relative flex items-center justify-center p-4 md:p-8 lg:p-12 overflow-hidden font-sans antialiased">
+      {/* Ambient Light Background Glows */}
+      <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-100/50 blur-[120px] rounded-full"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-emerald-100/50 blur-[120px] rounded-full"></div>
+
+      <div className="max-w-6xl w-full relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-24">
+
+        {/* Left Side: Dominant Branding */}
+        <div className="flex-1 text-center lg:text-left group order-1 lg:order-1">
+          <div className="relative inline-block mb-10">
+            <div className="absolute inset-0 bg-indigo-500 blur-3xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
+            <img
+              src={logo}
+              alt="CuraVox Logo"
+              className="w-64 h-64 md:w-96 md:h-96 relative drop-shadow-[0_30px_60px_rgba(79,70,229,0.35)] object-contain rounded-[4rem] transform transition-transform duration-1000 group-hover:scale-110 group-hover:rotate-2"
+            />
+          </div>
+          <h1 className="text-6xl md:text-8xl font-black text-slate-900 tracking-tighter mb-4 uppercase italic leading-none">
+            CuraVox
+          </h1>
+          <div className="h-2 w-48 bg-indigo-600 rounded-full mb-8 mx-auto lg:mx-0 shadow-lg shadow-indigo-200"></div>
+          <p className="text-lg md:text-xl text-slate-500 font-bold uppercase tracking-[0.3em] opacity-80 max-w-md mx-auto lg:mx-0 leading-relaxed italic">
+            Your Premium Health AI Companion
           </p>
+
+          <div className="mt-12 hidden lg:flex flex-wrap gap-4 opacity-40">
+            <div className="px-4 py-2 border border-slate-200 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-400">Secure Protocol</div>
+            <div className="px-4 py-2 border border-slate-200 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-400">Neural Sync</div>
+            <div className="px-4 py-2 border border-slate-200 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-400">256-Bit Crypt</div>
+          </div>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">Email / Username</label>
-              <input
-                id="email"
-                name="email"
-                type="text"
-                required
-                value={formData.email}
-                onChange={handleInputChange}
-                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white dark:bg-gray-700"
-                placeholder="Email or Username"
-              />
-            </div>
-            <div className="relative">
-              <label htmlFor="password" className="sr-only">Password</label>
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                required
-                value={formData.password}
-                onChange={handleInputChange}
-                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm bg-white dark:bg-gray-700"
-                placeholder="Password"
-              />
+        {/* Right Side: Auth Form Card */}
+        <div className="w-full max-w-lg order-2 lg:order-2">
+          <div className="bg-white/70 backdrop-blur-[60px] rounded-[4rem] p-10 md:p-14 shadow-[0_40px_100px_rgba(0,0,0,0.08)] border border-white/50 relative overflow-hidden group transition-all duration-700 hover:shadow-prism">
+            {/* Subtle Gradient Accent */}
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-emerald-400"></div>
+
+            <header className="mb-12">
+              <h2 className="text-4xl font-black text-slate-900 tracking-tighter mb-2 uppercase italic leading-none">
+                Sign In
+              </h2>
+              <p className="text-slate-500 font-bold text-sm tracking-tight opacity-60">
+                Welcome back to your clinical node
+              </p>
+            </header>
+
+            <form className="space-y-8" onSubmit={handleSubmit}>
+              <div className="space-y-6">
+                <div className="group">
+                  <label htmlFor="email" className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-6 mb-2 transition-colors group-focus-within:text-indigo-600">
+                    Email / Username
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="text"
+                    required
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-8 py-5 bg-slate-50/50 border border-slate-100 rounded-full text-slate-900 font-bold text-lg focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 focus:bg-white outline-none transition-all shadow-inner"
+                    placeholder="name@example.com"
+                  />
+                </div>
+
+                <div className="group">
+                  <label htmlFor="password" className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-6 mb-2 transition-colors group-focus-within:text-indigo-600">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      required
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      className="w-full px-8 py-5 bg-slate-50/50 border border-slate-100 rounded-full text-slate-900 font-bold text-lg focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 focus:bg-white outline-none transition-all shadow-inner"
+                      placeholder="Enter password"
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-6 flex items-center transition-colors text-slate-400 hover:text-indigo-600 outline-none"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeSlashIcon className="h-6 w-6" /> : <EyeIcon className="h-6 w-6" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between px-2">
+                <label className="flex items-center group cursor-pointer">
+                  <input
+                    id="remember-me"
+                    type="checkbox"
+                    className="w-5 h-5 border-2 border-slate-200 rounded-lg text-indigo-600 focus:ring-indigo-100 bg-white transition-all cursor-pointer shadow-inner"
+                  />
+                  <span className="ml-3 text-[11px] font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-900 transition-colors">
+                    Remember
+                  </span>
+                </label>
+                <a href="#" className="text-[11px] font-black text-indigo-600 hover:text-indigo-500 uppercase tracking-widest italic transition-colors underline decoration-indigo-100 underline-offset-4">
+                  Forgot Key?
+                </a>
+              </div>
+
               <button
-                type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-6 rounded-full bg-slate-900 text-white font-black text-xs uppercase tracking-[0.5em] transition-all shadow-xl hover:bg-slate-800 active:scale-95 disabled:opacity-50 group/btn relative overflow-hidden"
               >
-                {showPassword ? (
-                  <EyeSlashIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                ) : (
-                  <EyeIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
-                Remember me
-              </label>
-            </div>
-
-            <div className="text-sm">
-              <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
-                Forgot your password?
-              </a>
-            </div>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <span className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Signing in...
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-1000"></div>
+                <span className="relative z-10 flex items-center justify-center gap-3">
+                  {isLoading ? 'Processing...' : 'Sign In'}
                 </span>
-              ) : (
-                'Sign in'
-              )}
-            </button>
-          </div>
-        </form>
+              </button>
+            </form>
 
-        <div className="mt-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Demo Info</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            (If no account, use Register to create one)
-          </p>
+            <footer className="mt-12 text-center">
+              <p className="text-slate-500 font-bold text-xs uppercase tracking-widest border-t border-slate-100 pt-8">
+                New to CuraVox?{' '}
+                <Link to="/register" className="text-emerald-600 hover:text-emerald-500 italic font-black transition-colors underline decoration-emerald-100 underline-offset-4">
+                  Join Platform
+                </Link>
+              </p>
+            </footer>
+          </div>
         </div>
       </div>
     </div>

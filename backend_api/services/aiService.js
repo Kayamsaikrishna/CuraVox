@@ -59,6 +59,14 @@ class AdvancedMedicalAI {
       this.handlePythonOutput(data);
     });
 
+    // Handle Process Errors (e.g. Python not in PATH)
+    this.pythonProcess.on('error', (err) => {
+      const errMsg = `❌ CRITICAL: AI Engine Failed to Start: ${err.message}`;
+      console.error(errMsg);
+      this.logToFile(errMsg);
+      this.isPythonReady = false;
+    });
+
     // Handle Errors / Logs
     this.pythonProcess.stderr.on('data', (data) => {
       const errorMsg = `[AI Engine Log]: ${data.toString().trim()}`;
@@ -114,6 +122,26 @@ class AdvancedMedicalAI {
   }
 
   /**
+   * Wait for Python process to report READY
+   */
+  async waitForReady(timeoutMs = 120000) {
+    if (this.isPythonReady) return true;
+
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const check = setInterval(() => {
+        if (this.isPythonReady) {
+          clearInterval(check);
+          resolve(true);
+        } else if (Date.now() - start > timeoutMs) {
+          clearInterval(check);
+          reject(new Error(`AI Engine failed to become ready within ${timeoutMs / 1000}s`));
+        }
+      }, 500);
+    });
+  }
+
+  /**
    * Match response ID to pending promise
    */
   resolveRequest(message) {
@@ -153,13 +181,13 @@ class AdvancedMedicalAI {
       const jsonStr = JSON.stringify(payload) + '\n'; // Newline is critical
       this.pythonProcess.stdin.write(jsonStr);
 
-      // Timeout Safety (60s) - Increased to allow for initial model load
+      // Timeout Safety (90s) - Increased to allow for heavy clinical model operations
       setTimeout(() => {
         if (this.pendingRequests.has(requestId)) {
           this.pendingRequests.delete(requestId);
-          reject(new Error("AI Engine Timeout (60s)"));
+          reject(new Error("AI Engine Timeout (90s)"));
         }
-      }, 60000);
+      }, 90000);
     });
   }
 
@@ -255,6 +283,10 @@ class AdvancedMedicalAI {
   async performStartupCheck() {
     console.log('\n🏥 CuraVox AI Engine: Health Check (Persistent Mode)...');
     try {
+      // 1. Wait for readiness FIRST
+      await this.waitForReady(180000); // 3 minutes for absolute safety on slow HDD/CPU
+
+      // 2. Now call for status
       const status = await this.callPythonEngine('get_system_status', {});
 
       console.log('----------------------------------------');

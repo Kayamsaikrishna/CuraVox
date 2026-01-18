@@ -17,15 +17,12 @@ const TimePickerModal = ({ reminder, setReminder, onSave, onClose, isEditing }) 
     { key: 'saturday', label: 'Sat' }
   ];
 
-  // Generate time options in 30-minute intervals
   const timeOptions = [];
   for (let hour = 0; hour < 24; hour++) {
     for (let minute = 0; minute < 60; minute += 30) {
       const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
       const formattedTime = new Date(`2000-01-01T${timeString}`).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
+        hour: '2-digit', minute: '2-digit', hour12: true
       });
       timeOptions.push({ value: timeString, label: formattedTime });
     }
@@ -34,15 +31,13 @@ const TimePickerModal = ({ reminder, setReminder, onSave, onClose, isEditing }) 
   useEffect(() => {
     if (reminder) {
       setAvailableTimes(reminder.times || []);
-      setSelectedDays(reminder.days || [
-        'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
-      ]);
+      setSelectedDays(reminder.days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
     }
   }, [reminder]);
 
   const handleAddTime = () => {
     if (selectedTime && !availableTimes.includes(selectedTime)) {
-      setAvailableTimes([...availableTimes, selectedTime]);
+      setAvailableTimes([...availableTimes, selectedTime].sort());
     }
   };
 
@@ -59,309 +54,144 @@ const TimePickerModal = ({ reminder, setReminder, onSave, onClose, isEditing }) 
   };
 
   const handleSave = () => {
-    setReminder(prev => ({
-      ...prev,
-      times: availableTimes,
-      days: selectedDays
-    }));
+    setReminder(prev => ({ ...prev, times: availableTimes, days: selectedDays }));
     onSave();
   };
 
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}
+    <div
+      className="fixed inset-0 bg-[#020617]/40 backdrop-blur-xl flex items-center justify-center p-6 z-[1000] animate-fade-in"
       onClick={onClose}
     >
-      <div 
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '25px',
-          width: '90%',
-          maxWidth: '600px',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
-          border: '2px solid #3b82f6'
-        }}
+      <div
+        className="bg-white rounded-[3.5rem] w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-[0_40px_120px_-20px_rgba(79,70,229,0.2)] border border-slate-100 flex flex-col relative"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="time-picker-title"
-        tabIndex="-1"
       >
-        <h2 
-          id="time-picker-title"
-          style={{
-            fontSize: '24px',
-            fontWeight: 'bold',
-            color: '#1e40af',
-            marginBottom: '20px',
-            borderBottom: '2px solid #3b82f6',
-            paddingBottom: '10px'
-          }}
-          tabIndex="0"
-        >
-          {isEditing ? 'Edit Reminder' : 'Set New Reminder'}
-        </h2>
-
-        {/* Medicine Name and Dosage Inputs */}
-        <div style={{ marginBottom: '20px' }}>
-          <label 
-            htmlFor="medicineName" 
-            style={{ 
-              display: 'block', 
-              fontWeight: '600', 
-              color: '#374151', 
-              marginBottom: '8px',
-              fontSize: '16px'
-            }}
-            tabIndex="0"
+        {/* MODAL HEADER */}
+        <div className="p-12 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+              <span className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.4em] block">Set Schedule</span>
+            </div>
+            <h2 id="time-picker-title" className="text-4xl font-black text-[#020617] tracking-tighter">
+              {isEditing ? 'Edit Reminder' : 'Set Reminder'}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-14 h-14 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-300 hover:text-rose-500 hover:border-rose-100 transition-all shadow-sm"
           >
-            Medicine Name
-          </label>
-          <input
-            id="medicineName"
-            type="text"
-            value={reminder.medicineName || ''}
-            onChange={(e) => setReminder(prev => ({ ...prev, medicineName: e.target.value }))}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '2px solid #3b82f6',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: 'white'
-            }}
-            placeholder="Enter medicine name"
-            tabIndex="0"
-          />
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          </button>
         </div>
 
-        <div style={{ marginBottom: '20px' }}>
-          <label 
-            htmlFor="dosage" 
-            style={{ 
-              display: 'block', 
-              fontWeight: '600', 
-              color: '#374151', 
-              marginBottom: '8px',
-              fontSize: '16px'
-            }}
-            tabIndex="0"
-          >
-            Dosage
-          </label>
-          <input
-            id="dosage"
-            type="text"
-            value={reminder.dosage || ''}
-            onChange={(e) => setReminder(prev => ({ ...prev, dosage: e.target.value }))}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '2px solid #3b82f6',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: 'white'
-            }}
-            placeholder="Enter dosage (e.g., Take 1 tablet)"
-            tabIndex="0"
-          />
-        </div>
-
-        {/* Time Selection */}
-        <div style={{ marginBottom: '20px' }}>
-          <h3 
-            style={{ 
-              fontWeight: '600', 
-              color: '#374151', 
-              marginBottom: '12px',
-              fontSize: '18px'
-            }}
-            tabIndex="0"
-          >
-            Select Time(s)
-          </h3>
-          
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
-            <select
-              value={selectedTime}
-              onChange={(e) => setSelectedTime(e.target.value)}
-              style={{
-                padding: '10px',
-                border: '2px solid #3b82f6',
-                borderRadius: '6px',
-                fontSize: '16px',
-                backgroundColor: 'white',
-                flex: 1
-              }}
-              tabIndex="0"
-            >
-              <option value="">Select a time</option>
-              {timeOptions.map((time) => (
-                <option key={time.value} value={time.value}>
-                  {time.label}
-                </option>
-              ))}
-            </select>
-            
-            <button
-              onClick={handleAddTime}
-              style={{
-                padding: '10px 15px',
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: '2px solid #2563eb',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '16px'
-              }}
-              tabIndex="0"
-            >
-              Add Time
-            </button>
+        <div className="p-12 space-y-12">
+          {/* MEDICINE IDENTITY */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] pl-2">Medicine Name</label>
+              <input
+                type="text"
+                value={reminder.medicineName || ''}
+                onChange={(e) => setReminder(prev => ({ ...prev, medicineName: e.target.value }))}
+                className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-[#020617] outline-none focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600/30 transition-all placeholder:text-slate-300"
+                placeholder="e.g. Atorvastatin"
+              />
+            </div>
+            <div className="space-y-4">
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] pl-2">Dosage</label>
+              <input
+                type="text"
+                value={reminder.dosage || ''}
+                onChange={(e) => setReminder(prev => ({ ...prev, dosage: e.target.value }))}
+                className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-[#020617] outline-none focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600/30 transition-all placeholder:text-slate-300"
+                placeholder="e.g. 20mg"
+              />
+            </div>
           </div>
 
-          {/* Selected Times Display */}
-          {availableTimes.length > 0 && (
-            <div style={{ marginTop: '15px' }}>
-              <p style={{ fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
-                Selected Times:
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {/* TEMPORAL SELECTION */}
+          <div className="space-y-8">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] pl-2">Times</label>
+            <div className="flex gap-4">
+              <select
+                value={selectedTime}
+                onChange={(e) => setSelectedTime(e.target.value)}
+                className="flex-1 px-8 py-5 bg-white border border-slate-100 rounded-2xl font-black text-[12px] uppercase tracking-widest text-indigo-600 outline-none shadow-sm cursor-pointer focus:border-indigo-200"
+              >
+                <option value="">Select Time</option>
+                {timeOptions.map((time) => (
+                  <option key={time.value} value={time.value}>{time.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleAddTime}
+                className="px-10 bg-indigo-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-100"
+              >
+                Add Time
+              </button>
+            </div>
+
+            {/* TIME CHIPS */}
+            {availableTimes.length > 0 && (
+              <div className="flex flex-wrap gap-4 p-8 bg-slate-50/50 rounded-[2.5rem] border border-slate-100 border-dashed">
                 {availableTimes.map((time) => {
                   const formattedTime = new Date(`2000-01-01T${time}`).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
+                    hour: '2-digit', minute: '2-digit', hour12: true
                   });
                   return (
-                    <div
-                      key={time}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        backgroundColor: '#dbeafe',
-                        color: '#1e40af',
-                        padding: '8px 12px',
-                        borderRadius: '20px',
-                        fontSize: '14px'
-                      }}
-                    >
-                      {formattedTime}
+                    <div key={time} className="flex items-center gap-4 px-6 py-3 bg-white border border-slate-100 rounded-xl shadow-sm group hover:border-indigo-200 transition-colors">
+                      <span className="text-[12px] font-black text-indigo-600 uppercase tracking-widest">{formattedTime}</span>
                       <button
                         onClick={() => handleRemoveTime(time)}
-                        style={{
-                          marginLeft: '8px',
-                          backgroundColor: '#ef4444',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '50%',
-                          width: '20px',
-                          height: '20px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                        aria-label={`Remove time ${formattedTime}`}
+                        className="text-slate-300 hover:text-rose-500 transition-colors"
                       >
-                        ×
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                       </button>
                     </div>
                   );
                 })}
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Day Selection */}
-        <div style={{ marginBottom: '25px' }}>
-          <h3 
-            style={{ 
-              fontWeight: '600', 
-              color: '#374151', 
-              marginBottom: '12px',
-              fontSize: '18px'
-            }}
-            tabIndex="0"
-          >
-            Select Days
-          </h3>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
-            {daysOfWeek.map((day) => (
-              <button
-                key={day.key}
-                onClick={() => toggleDaySelection(day.key)}
-                style={{
-                  padding: '10px',
-                  backgroundColor: selectedDays.includes(day.key) ? '#3b82f6' : '#f3f4f6',
-                  color: selectedDays.includes(day.key) ? 'white' : '#4b5563',
-                  border: '2px solid #3b82f6',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: selectedDays.includes(day.key) ? '600' : 'normal',
-                  fontSize: '14px'
-                }}
-                tabIndex="0"
-                aria-pressed={selectedDays.includes(day.key)}
-              >
-                {day.label}
-              </button>
-            ))}
+          {/* CYCLE SELECTION */}
+          <div className="space-y-8">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] pl-2">Days</label>
+            <div className="grid grid-cols-7 gap-3">
+              {daysOfWeek.map((day) => (
+                <button
+                  key={day.key}
+                  onClick={() => toggleDaySelection(day.key)}
+                  className={`py-5 rounded-2xl text-[11px] font-black transition-all ${selectedDays.includes(day.key)
+                    ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-100'
+                    : 'bg-slate-50 text-slate-400 border border-slate-100 hover:border-indigo-100'
+                    }`}
+                >
+                  {day.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+        {/* MODAL FOOTER */}
+        <div className="p-12 bg-slate-50/50 border-t border-slate-50 flex gap-6">
           <button
             onClick={onClose}
-            style={{
-              padding: '12px 20px',
-              backgroundColor: '#9ca3af',
-              color: 'white',
-              border: '2px solid #6b7280',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '16px'
-            }}
-            tabIndex="0"
+            className="flex-1 py-6 rounded-2xl bg-white border border-slate-100 text-slate-400 font-black text-[11px] uppercase tracking-[0.3em] hover:text-slate-600 transition-all"
           >
             Cancel
           </button>
-          
           <button
             onClick={handleSave}
-            style={{
-              padding: '12px 20px',
-              backgroundColor: '#10b981',
-              color: 'white',
-              border: '2px solid #059669',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '16px'
-            }}
-            tabIndex="0"
+            className="flex-[1.5] py-6 rounded-2xl bg-indigo-600 text-white font-black text-[11px] uppercase tracking-[0.3em] shadow-[0_20px_40px_-10px_rgba(79,70,229,0.3)] hover:bg-indigo-700 transition-all"
           >
-            Save Reminder
+            Save Schedule
           </button>
         </div>
       </div>

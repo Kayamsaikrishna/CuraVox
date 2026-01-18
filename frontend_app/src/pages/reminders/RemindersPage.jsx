@@ -1,87 +1,76 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppData } from '../../contexts/AppDataContext';
 import useAccessibility from '../../hooks/useAccessibility';
 import TimePickerModal from '../../components/reminders/TimePickerModal';
 
+// --- Ultra-Prism Icons ---
+const IconClock = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+);
+const IconCheck = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+);
+const IconArchive = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>
+);
+const IconEdit = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+);
+const IconTrash = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
+);
+const IconPlus = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+);
+
 const RemindersPage = () => {
+  const navigate = useNavigate();
   const { state, actions } = useAppData();
+  const { speak } = useAccessibility();
+  const mainRef = useRef(null);
+
   const [activeTab, setActiveTab] = useState('upcoming');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [editingReminder, setEditingReminder] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [tempReminder, setTempReminder] = useState({
     medicineName: '',
     dosage: '',
     times: [],
     days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
   });
-  const [isAdding, setIsAdding] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState('all');
-  const { speak } = useAccessibility();
-  const mainRef = useRef(null);
 
   useEffect(() => {
-    // Focus main content area for screen readers
-    if (mainRef.current) {
-      mainRef.current.focus();
-    }
+    if (mainRef.current) mainRef.current.focus();
+    speak('Reminders loaded. Stay on track with your medicines.');
   }, []);
 
-  // Filter reminders based on activeTab, searchTerm, and filter
-  const filteredReminders = state.reminders.filter(reminder => {
-    // Apply search filter
-    const matchesSearch = !searchTerm || 
-      reminder.medicineName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reminder.dosage.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Apply activeTab filter
-    let matchesTab = true;
-    if (activeTab === 'upcoming') {
-      matchesTab = reminder.isActive && new Date(reminder.nextDue) >= new Date();
-    } else if (activeTab === 'taken') {
-      matchesTab = reminder.lastTaken && new Date(reminder.lastTaken).toDateString() === new Date().toDateString();
-    } else if (activeTab === 'all') {
-      matchesTab = true;
-    }
-    
-    // Apply status filter
-    let matchesStatus = true;
-    if (filter === 'active') {
-      matchesStatus = reminder.isActive;
-    } else if (filter === 'inactive') {
-      matchesStatus = !reminder.isActive;
-    }
-    
-    return matchesSearch && matchesTab && matchesStatus;
-  });
+  const calculateNextDue = (times, days) => {
+    const now = new Date();
+    const currentDay = now.getDay();
+    const dayMap = { 'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6 };
 
-  const handleAddReminder = () => {
-    setIsAdding(true);
-    setEditingReminder(null);
-    setTempReminder({
-      medicineName: '',
-      dosage: '',
-      times: [],
-      days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-    });
-    setShowTimePicker(true);
-    speak('Adding new reminder. Please enter medicine name and dosage.');
-  };
-
-  const handleEditReminder = (reminder) => {
-    setIsAdding(false);
-    setEditingReminder(reminder);
-    setTempReminder({
-      medicineName: reminder.medicineName,
-      dosage: reminder.dosage,
-      times: reminder.times || [],
-      days: reminder.days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-    });
-    setShowTimePicker(true);
-    speak(`Editing reminder for ${reminder.medicineName}`);
+    for (let i = 0; i < 7; i++) {
+      const checkDay = (currentDay + i) % 7;
+      const dayName = Object.keys(dayMap).find(key => dayMap[key] === checkDay);
+      if (days.includes(dayName)) {
+        const sortedTimes = [...times].sort();
+        for (const time of sortedTimes) {
+          const [h, m] = time.split(':').map(Number);
+          const next = new Date(now);
+          next.setDate(now.getDate() + i);
+          next.setHours(h, m, 0, 0);
+          if (next > now) return next.toISOString();
+        }
+      }
+    }
+    return null;
   };
 
   const handleSaveReminder = () => {
+    const nextDue = tempReminder.times.length > 0 ? calculateNextDue(tempReminder.times, tempReminder.days) : null;
     const newReminder = {
       id: editingReminder ? editingReminder.id : Date.now(),
       medicineName: tempReminder.medicineName,
@@ -90,711 +79,233 @@ const RemindersPage = () => {
       days: tempReminder.days,
       isActive: true,
       createdAt: editingReminder ? editingReminder.createdAt : new Date().toISOString(),
-      lastTaken: null,
-      nextDue: tempReminder.times.length > 0 ? calculateNextDue(tempReminder.times, tempReminder.days) : null
+      lastTaken: editingReminder ? editingReminder.lastTaken : null,
+      nextDue: nextDue
     };
 
-    if (editingReminder) {
-      actions.updateReminder(newReminder);
-      speak(`Reminder for ${newReminder.medicineName} updated successfully`);
-    } else {
-      actions.addReminder(newReminder);
-      speak(`New reminder for ${newReminder.medicineName} added successfully`);
-    }
+    if (editingReminder) actions.updateReminder(newReminder);
+    else actions.addReminder(newReminder);
 
     setShowTimePicker(false);
-    setTempReminder({
-      medicineName: '',
-      dosage: '',
-      times: [],
-      days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-    });
+    speak(`Reminder for ${newReminder.medicineName} saved.`);
   };
 
-  const handleDeleteReminder = (id) => {
-    actions.removeReminder(id);
-    speak('Reminder deleted successfully');
-  };
+  const filteredReminders = state.reminders.filter(reminder => {
+    const matchesSearch = !searchTerm ||
+      reminder.medicineName.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const handleToggleReminder = (id) => {
-    const reminder = state.reminders.find(r => r.id === id);
-    if (reminder) {
-      const updatedReminder = { ...reminder, isActive: !reminder.isActive };
-      actions.updateReminder(updatedReminder);
-      speak(`${reminder.medicineName} reminder ${updatedReminder.isActive ? 'activated' : 'deactivated'}`);
-    }
-  };
+    let matchesTab = true;
+    if (activeTab === 'upcoming') matchesTab = reminder.isActive && (reminder.nextDue ? new Date(reminder.nextDue) >= new Date() : true);
+    else if (activeTab === 'taken') matchesTab = reminder.lastTaken && new Date(reminder.lastTaken).toDateString() === new Date().toDateString();
 
-  const handleMarkAsTaken = (id) => {
-    actions.markAsTaken(id);
-    speak('Dose marked as taken');
-  };
+    return matchesSearch && matchesTab;
+  });
 
-  const calculateNextDue = (times, days) => {
-    const now = new Date();
-    const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const currentHours = now.getHours();
-    const currentMinutes = now.getMinutes();
-    
-    // Map days to numbers (Monday = 1, Sunday = 0)
-    const dayMap = {
-      'sunday': 0,
-      'monday': 1,
-      'tuesday': 2,
-      'wednesday': 3,
-      'thursday': 4,
-      'friday': 5,
-      'saturday': 6
-    };
-    
-    const todayIndex = days.indexOf(dayMap[currentDay]);
-    
-    // First, check if there are any remaining times for today
-    if (todayIndex !== -1) {
-      for (const time of times.sort()) {
-        const [hours, minutes] = time.split(':').map(Number);
-        if (hours > currentHours || (hours === currentHours && minutes > currentMinutes)) {
-          const nextDue = new Date(now);
-          nextDue.setHours(hours, minutes, 0, 0);
-          return nextDue.toISOString();
-        }
-      }
-    }
-    
-    // If no remaining times today, find the next day with scheduled times
-    for (let i = 1; i <= 7; i++) {
-      const nextDay = (currentDay + i) % 7;
-      if (days.includes(nextDay)) {
-        const nextDue = new Date(now);
-        nextDue.setDate(now.getDate() + i);
-        // Use the first scheduled time for that day
-        const [hours, minutes] = times[0].split(':').map(Number);
-        nextDue.setHours(hours, minutes, 0, 0);
-        return nextDue.toISOString();
-      }
-    }
-    
-    // Fallback to the first time in the week
-    if (days.length > 0 && times.length > 0) {
-      const nextDay = days[0];
-      const daysUntil = nextDay > currentDay ? nextDay - currentDay : (7 - currentDay) + nextDay;
-      const nextDue = new Date(now);
-      nextDue.setDate(now.getDate() + daysUntil);
-      const [hours, minutes] = times[0].split(':').map(Number);
-      nextDue.setHours(hours, minutes, 0, 0);
-      return nextDue.toISOString();
-    }
-    
-    return null;
-  };
-
-  const formatTime = (dateString) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString();
-  };
-
-  const getDayName = (dayNumber) => {
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[dayNumber] || '';
-  };
-
-  // Function to announce reminder details for screen readers
-  const announceReminderDetails = (reminder) => {
-    const details = `${reminder.medicineName}. Dosage: ${reminder.dosage}. Next due: ${formatTime(reminder.nextDue)}. ${reminder.isActive ? 'Active' : 'Inactive'} reminder.`;
-    speak(details);
-  };
+  const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A';
 
   return (
-    <div 
-      style={{ 
-        backgroundColor: '#f0f9ff', 
-        minHeight: '100vh', 
-        padding: '20px',
-        fontFamily: 'Arial, sans-serif',
-        lineHeight: '1.6'
-      }}
-      tabIndex="-1"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-screen bg-[#f8fafc] pb-32 font-sans selection:bg-indigo-100 outline-none"
       ref={mainRef}
+      tabIndex="-1"
     >
-      {/* Screen reader announcement area */}
-      <div 
-        aria-live="polite" 
-        aria-atomic="true" 
-        style={{ 
-          position: 'absolute', 
-          left: '-10000px', 
-          width: '1px', 
-          height: '1px', 
-          overflow: 'hidden' 
-        }}
-      />
-
-      <div style={{ 
-        maxWidth: '1000px', 
-        margin: '0 auto',
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        padding: '30px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        border: '2px solid #3b82f6'
-      }}>
-        <header style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h1 
-            style={{ 
-              fontSize: '28px', 
-              fontWeight: 'bold', 
-              color: '#1e40af',
-              marginBottom: '10px',
-              borderBottom: '3px solid #3b82f6',
-              paddingBottom: '10px'
+      <header className="bg-white/90 backdrop-blur-2xl border-b border-slate-200 px-10 py-20 relative overflow-hidden">
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-600 via-emerald-500 to-indigo-600"></div>
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-12 relative z-10">
+          <div>
+            <motion.div initial={{ x: -20 }} animate={{ x: 0 }} className="flex items-center gap-4 mb-6">
+              <div className="w-2 h-10 bg-indigo-600 rounded-full"></div>
+              <span className="text-[12px] font-black text-indigo-600 uppercase tracking-[0.5em]">Medicine Reminders</span>
+            </motion.div>
+            <h1 className="text-8xl font-black text-[#020617] tracking-tighter leading-none mb-8">My <span className="text-indigo-600">Schedule</span></h1>
+            <p className="text-2xl text-slate-500 font-bold max-w-2xl leading-relaxed italic opacity-80 border-l-4 border-indigo-100 pl-8">
+              Stay on track with your medication schedule.
+            </p>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05, y: -4 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              setEditingReminder(null);
+              setTempReminder({
+                medicineName: '', dosage: '', times: [],
+                days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+              });
+              setShowTimePicker(true);
+              speak('Setting up a new reminder');
             }}
-            tabIndex="0"
+            className="px-12 py-8 bg-indigo-600 text-white rounded-[3rem] font-black text-[13px] uppercase tracking-[0.4em] shadow-[0_30px_60px_-15px_rgba(79,70,229,0.4)] flex items-center gap-6"
           >
-            Medication Reminders
-          </h1>
-          <p 
-            style={{ 
-              fontSize: '16px', 
-              color: '#4b5563',
-              fontStyle: 'italic'
-            }}
-            tabIndex="0"
-          >
-            Set and manage your medication schedule with customizable alerts
-          </p>
-        </header>
+            <IconPlus /> Add Reminder
+          </motion.button>
+        </div>
+      </header>
 
-        {/* Action Bar */}
-        <div style={{ 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          gap: '15px', 
-          marginBottom: '25px',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{ flex: '1', minWidth: '250px' }}>
+      <div className="max-w-6xl mx-auto px-10 mt-16">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-20">
+          <div className="lg:col-span-8 relative group">
+            <div className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+            </div>
             <input
               type="text"
               placeholder="Search reminders..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '2px solid #3b82f6',
-                borderRadius: '6px',
-                fontSize: '16px',
-                backgroundColor: 'white'
-              }}
-              tabIndex="0"
+              className="w-full pl-20 pr-10 py-7 bg-white border border-slate-100 rounded-[3rem] shadow-sm outline-none focus:ring-8 focus:ring-indigo-600/5 focus:border-indigo-600/20 font-black text-slate-800 transition-all text-xl"
             />
           </div>
-          <button
-            onClick={handleAddReminder}
-            style={{
-              padding: '12px 20px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: '2px solid #2563eb',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '16px'
-            }}
-            tabIndex="0"
-          >
-            Add Reminder
-          </button>
+          <div className="lg:col-span-4 flex items-center gap-4 bg-white px-8 py-4 rounded-[3rem] border border-slate-100 shadow-sm">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter</span>
+            <div className="h-4 w-px bg-slate-100 mx-2"></div>
+            {['upcoming', 'taken'].map(t => (
+              <button
+                key={t}
+                onClick={() => { setActiveTab(t); speak(`Filtering for ${t} items`); }}
+                className={`flex-1 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === t ? 'bg-[#020617] text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '5px', 
-          marginBottom: '25px',
-          borderBottom: '2px solid #d1d5db'
-        }}>
-          <button
-            onClick={() => {
-              setActiveTab('upcoming');
-              speak('Showing upcoming reminders');
-            }}
-            style={{
-              padding: '12px 20px',
-              backgroundColor: activeTab === 'upcoming' ? '#3b82f6' : '#f3f4f6',
-              color: activeTab === 'upcoming' ? 'white' : '#4b5563',
-              border: '1px solid #d1d5db',
-              borderRight: 'none',
-              cursor: 'pointer',
-              fontWeight: '600',
-              borderRadius: '6px 0 0 6px'
-            }}
-            tabIndex="0"
-          >
-            Upcoming ({state.reminders.filter(r => r.isActive && new Date(r.nextDue) >= new Date()).length})
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('taken');
-              speak('Showing taken medicines');
-            }}
-            style={{
-              padding: '12px 20px',
-              backgroundColor: activeTab === 'taken' ? '#3b82f6' : '#f3f4f6',
-              color: activeTab === 'taken' ? 'white' : '#4b5563',
-              border: '1px solid #d1d5db',
-              cursor: 'pointer',
-              fontWeight: '600'
-            }}
-            tabIndex="0"
-          >
-            Taken Today ({state.reminders.filter(rem => 
-              rem.lastTaken && 
-              new Date(rem.lastTaken).toDateString() === new Date().toDateString()
-            ).length})
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('all');
-              speak('Showing all reminders');
-            }}
-            style={{
-              padding: '12px 20px',
-              backgroundColor: activeTab === 'all' ? '#3b82f6' : '#f3f4f6',
-              color: activeTab === 'all' ? 'white' : '#4b5563',
-              border: '1px solid #d1d5db',
-              borderLeft: 'none',
-              cursor: 'pointer',
-              fontWeight: '600',
-              borderRadius: '0 6px 6px 0'
-            }}
-            tabIndex="0"
-          >
-            All ({state.reminders.length})
-          </button>
-        </div>
-
-        {/* Filter Controls */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '15px', 
-          marginBottom: '25px',
-          padding: '15px',
-          backgroundColor: '#f0f9ff',
-          borderRadius: '8px',
-          border: '2px solid #bae6fd'
-        }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', color: '#1e40af' }}>Status:</label>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              style={{
-                padding: '8px',
-                border: '2px solid #3b82f6',
-                borderRadius: '4px',
-                backgroundColor: 'white',
-                color: '#1e40af',
-                fontSize: '14px'
-              }}
-              tabIndex="0"
+        <AnimatePresence mode="wait">
+          {filteredReminders.length > 0 ? (
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12"
             >
-              <option value="all">All</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Stats Cards */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '15px',
-          marginBottom: '25px'
-        }}>
-          <div style={{
-            padding: '15px',
-            backgroundColor: '#dbeafe',
-            border: '2px solid #3b82f6',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e40af' }}>{state.reminders.length}</div>
-            <div style={{ color: '#1e40af', fontWeight: '500' }}>Total Reminders</div>
-          </div>
-          <div style={{
-            padding: '15px',
-            backgroundColor: '#dcfce7',
-            border: '2px solid #22c55e',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#16a34a' }}>
-              {state.reminders.filter(r => r.isActive).length}
-            </div>
-            <div style={{ color: '#16a34a', fontWeight: '500' }}>Active Reminders</div>
-          </div>
-          <div style={{
-            padding: '15px',
-            backgroundColor: '#fed7aa',
-            border: '2px solid #f97316',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ea580c' }}>
-              {state.reminders.filter(rem => 
-                rem.lastTaken && 
-                new Date(rem.lastTaken).toDateString() === new Date().toDateString()
-              ).length}
-            </div>
-            <div style={{ color: '#ea580c', fontWeight: '500' }}>Taken Today</div>
-          </div>
-        </div>
-
-        {/* Loading State */}
-        {state.loading.reminders && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '40px',
-            textAlign: 'center'
-          }}>
-            <div>
-              <div style={{
-                fontSize: '24px',
-                color: '#3b82f6',
-                marginBottom: '10px'
-              }}>Loading reminders...</div>
-              <div style={{ color: '#6b7280' }}>Please wait while we load your medication reminders</div>
-            </div>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!state.loading.reminders && state.reminders.length === 0 && (
-          <div style={{
-            padding: '40px',
-            textAlign: 'center',
-            backgroundColor: '#f9fafb',
-            border: '2px dashed #d1d5db',
-            borderRadius: '8px'
-          }}>
-            <div style={{ fontSize: '24px', color: '#6b7280', marginBottom: '10px' }}>No Reminders Yet</div>
-            <p style={{ color: '#6b7280', marginBottom: '20px' }}>
-              You haven't set any medication reminders yet. Click "Add Reminder" to get started.
-            </p>
-            <button
-              onClick={handleAddReminder}
-              style={{
-                padding: '12px 24px',
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: '2px solid #2563eb',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '16px'
-              }}
-              tabIndex="0"
-            >
-              Add Your First Reminder
-            </button>
-          </div>
-        )}
-
-        {/* Reminders List */}
-        {!state.loading.reminders && state.reminders.length > 0 && (
-          <>
-            <div style={{ marginBottom: '15px' }}>
-              <p style={{ color: '#4b5563' }}>
-                Showing {filteredReminders.length} of {state.reminders.length} reminders
-              </p>
-            </div>
-
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
-              gap: '20px',
-              marginBottom: '25px'
-            }}>
-              {filteredReminders.map((reminder) => (
-                <div
+              {filteredReminders.map((reminder, idx) => (
+                <motion.div
                   key={reminder.id}
-                  style={{
-                    border: `2px solid ${reminder.isActive ? '#3b82f6' : '#d1d5db'}`,
-                    borderRadius: '8px',
-                    padding: '20px',
-                    backgroundColor: 'white',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                  }}
+                  whileHover={{ y: -12 }}
+                  className="bg-white rounded-[4rem] p-12 border border-slate-50 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.02)] hover:shadow-[0_60px_100px_-20px_rgba(79,70,229,0.12)] transition-all flex flex-col min-h-[550px] relative overflow-hidden group"
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
-                    <div>
-                      <h3 
-                        style={{ 
-                          fontSize: '18px', 
-                          fontWeight: '600', 
-                          color: reminder.isActive ? '#1e40af' : '#6b7280',
-                          marginBottom: '5px'
-                        }}
-                        tabIndex="0"
-                      >
-                        {reminder.medicineName}
-                      </h3>
-                      <p style={{ color: '#6b7280', fontSize: '14px' }}>
-                        {reminder.dosage}
-                      </p>
+                  <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-indigo-600 to-indigo-400 opacity-60"></div>
+
+                  <div className="flex justify-between items-start mb-10">
+                    <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-[2rem] flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">
+                      <IconClock />
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="flex gap-4 opacity-0 group-hover:opacity-100 transition-all">
                       <button
-                        onClick={() => announceReminderDetails(reminder)}
-                        style={{
-                          backgroundColor: '#f0f9ff',
-                          border: '2px solid #3b82f6',
-                          borderRadius: '50%',
-                          width: '36px',
-                          height: '36px',
-                          cursor: 'pointer',
-                          fontSize: '16px'
+                        onClick={() => {
+                          setEditingReminder(reminder);
+                          setTempReminder({ ...reminder });
+                          setShowTimePicker(true);
                         }}
-                        tabIndex="0"
-                        aria-label={`Read details for ${reminder.medicineName} reminder`}
-                      >
-                        🔊
-                      </button>
+                        className="p-5 bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-2xl transition-all"
+                      ><IconEdit /></button>
                       <button
-                        onClick={() => handleEditReminder(reminder)}
-                        style={{
-                          backgroundColor: '#f0f9ff',
-                          border: '2px solid #3b82f6',
-                          borderRadius: '50%',
-                          width: '36px',
-                          height: '36px',
-                          cursor: 'pointer',
-                          fontSize: '16px'
-                        }}
-                        tabIndex="0"
-                        aria-label={`Edit ${reminder.medicineName} reminder`}
-                      >
-                        ✏️
-                      </button>
+                        onClick={() => { actions.removeReminder(reminder.id); speak('Reminder deleted'); }}
+                        className="p-5 bg-rose-50 text-rose-300 hover:text-rose-600 rounded-2xl transition-all"
+                      ><IconTrash /></button>
                     </div>
                   </div>
 
-                  <div style={{ marginBottom: '15px' }}>
-                    <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Schedule:</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                      {reminder.times.map((time, idx) => (
-                        <span
-                          key={idx}
-                          style={{
-                            backgroundColor: '#dbeafe',
-                            color: '#1e40af',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontSize: '12px'
-                          }}
-                        >
-                          {formatTime(time)}
-                        </span>
-                      ))}
+                  <div className="flex-1">
+                    <h3 className="text-4xl font-black text-[#020617] tracking-tighter leading-tight mb-4 group-hover:text-indigo-600 transition-colors">
+                      {reminder.medicineName}
+                    </h3>
+                    <div className="inline-block px-6 py-3 bg-emerald-50 rounded-2xl text-[11px] font-black text-emerald-700 uppercase tracking-widest border border-emerald-100 mb-10">
+                      {reminder.dosage}
+                    </div>
+
+                    <div className="space-y-6 pt-8 border-t border-slate-50">
+                      <div className="flex items-center gap-6">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 shadow-[0_0_10px_rgba(79,70,229,1)]"></div>
+                        <p className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Next Due: <span className="text-indigo-600">{formatTime(reminder.nextDue)}</span></p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {reminder.days.map((d, i) => (
+                          <span key={i} className="px-4 py-2 bg-slate-50 rounded-xl text-[9px] font-black text-slate-400 uppercase tracking-widest border border-slate-100 group-hover:border-indigo-100 transition-colors">{d.slice(0, 3)}</span>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  <div style={{ marginBottom: '15px' }}>
-                    <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Days:</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                      {reminder.days.map((day, idx) => (
-                        <span
-                          key={idx}
-                          style={{
-                            backgroundColor: '#d1fae5',
-                            color: '#065f46',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontSize: '12px'
-                          }}
-                        >
-                          {day.charAt(0).toUpperCase() + day.slice(1)}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="pt-10 flex gap-4">
+                    <button
+                      onClick={() => { actions.markAsTaken(reminder.id); speak('Verification complete'); }}
+                      className="flex-1 py-6 bg-emerald-600 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-xl shadow-emerald-100 transition-all hover:bg-emerald-700 active:scale-95"
+                    >
+                      Mark as Taken
+                    </button>
+                    <button
+                      onClick={() => {
+                        const updated = { ...reminder, isActive: !reminder.isActive };
+                        actions.updateReminder(updated);
+                        speak(`Reminder ${updated.isActive ? 'active' : 'off'}`);
+                      }}
+                      className={`w-20 h-20 rounded-[2rem] flex items-center justify-center transition-all ${reminder.isActive ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-600'}`}
+                    >
+                      {reminder.isActive ? <div className="w-3 h-3 bg-rose-500 rounded-sm"></div> : <div className="w-0 h-0 border-y-8 border-y-transparent border-l-12 border-l-emerald-600 ml-1"></div>}
+                    </button>
                   </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="py-40 text-center bg-white rounded-[5rem] border-4 border-dashed border-slate-50"
+            >
+              <div className="w-32 h-32 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-10 text-slate-200">
+                <IconArchive />
+              </div>
+              <h3 className="text-5xl font-black text-slate-900 tracking-tighter mb-6">No Reminders Found</h3>
+              <p className="text-2xl text-slate-400 font-bold max-w-lg mx-auto mb-12 italic leading-relaxed">No reminders detected for this filter.</p>
+              <button
+                onClick={() => setActiveTab('upcoming')}
+                className="px-16 py-8 bg-indigo-600 text-white rounded-[3rem] font-black text-[13px] uppercase tracking-[0.4em] shadow-2xl"
+              >
+                Reset Filter
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                  <div style={{ marginBottom: '15px' }}>
-                    <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Next Due:</p>
-                    <p style={{ color: '#6b7280', fontWeight: '600' }}>
-                      {reminder.nextDue ? `${formatTime(reminder.nextDue)} on ${formatDate(reminder.nextDue)}` : 'Not scheduled'}
-                    </p>
-                  </div>
-
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '10px', 
-                    flexWrap: 'wrap',
-                    paddingTop: '15px',
-                    borderTop: '1px solid #e5e7eb'
-                  }}>
-                    <button
-                      onClick={() => handleToggleReminder(reminder.id)}
-                      style={{
-                        padding: '8px 12px',
-                        backgroundColor: reminder.isActive ? '#ef4444' : '#10b981',
-                        color: 'white',
-                        border: '2px solid ' + (reminder.isActive ? '#dc2626' : '#059669'),
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        flex: 1,
-                        minWidth: '100px'
-                      }}
-                      tabIndex="0"
-                    >
-                      {reminder.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                    
-                    <button
-                      onClick={() => handleMarkAsTaken(reminder.id)}
-                      style={{
-                        padding: '8px 12px',
-                        backgroundColor: '#10b981',
-                        color: 'white',
-                        border: '2px solid #059669',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        flex: 1,
-                        minWidth: '100px'
-                      }}
-                      tabIndex="0"
-                    >
-                      Mark Taken
-                    </button>
-                    
-                    <button
-                      onClick={() => handleDeleteReminder(reminder.id)}
-                      style={{
-                        padding: '8px 12px',
-                        backgroundColor: '#9ca3af',
-                        color: 'white',
-                        border: '2px solid #6b7280',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        flex: 1,
-                        minWidth: '100px'
-                      }}
-                      tabIndex="0"
-                    >
-                      Delete
-                    </button>
-                  </div>
+        <div className="mt-32 grid grid-cols-1 lg:grid-cols-2 gap-12">
+          <div className="p-16 bg-white rounded-[4rem] border border-slate-50 group hover:shadow-2xl transition-all">
+            <h4 className="text-3xl font-black text-[#020617] tracking-tight mb-10">Care Rules</h4>
+            <div className="space-y-8">
+              {[
+                "Add your medicines in the Medicine Vault.",
+                "Set clear dosages for each reminder.",
+                "Follow your schedule carefully."
+              ].map((text, i) => (
+                <div key={i} className="flex items-start gap-6 border-l-4 border-indigo-100 pl-8 py-2 group-hover:border-indigo-600 transition-colors">
+                  <p className="text-sm font-black text-slate-500 uppercase tracking-widest leading-relaxed opacity-70 group-hover:opacity-100">{text}</p>
                 </div>
               ))}
             </div>
-          </>
-        )}
-
-        {/* Time Picker Modal */}
-        {showTimePicker && (
-          <TimePickerModal
-            reminder={tempReminder}
-            setReminder={setTempReminder}
-            onSave={handleSaveReminder}
-            onClose={() => {
-              setShowTimePicker(false);
-              setTempReminder({
-                medicineName: '',
-                dosage: '',
-                times: [],
-                days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-              });
-            }}
-            isEditing={!!editingReminder}
-          />
-        )}
-
-        {/* Instructions Section */}
-        <div style={{ 
-          marginTop: '30px', 
-          padding: '20px', 
-          backgroundColor: '#e0f2fe', 
-          border: '2px solid #0ea5e9',
-          borderRadius: '8px' 
-        }}>
-          <h3 
-            style={{ 
-              fontSize: '18px', 
-              fontWeight: '600', 
-              color: '#0284c7',
-              marginBottom: '15px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-            tabIndex="0"
-          >
-            <span style={{ fontSize: '24px', marginRight: '10px' }}>ℹ️</span>
-            How to Use Reminders
-          </h3>
-          <ul style={{ 
-            color: '#0284c7',
-            paddingLeft: '20px',
-            fontSize: '14px'
-          }}>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Click "Add Reminder" to create a new medication reminder</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Set the medicine name, dosage, times, and days for your reminder</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Use the toggle to activate or deactivate reminders as needed</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Mark doses as taken to track your medication schedule</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">View upcoming reminders to stay on schedule</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Check "Taken Today" to see what you've already taken</li>
-            <li tabIndex="0">Use the search bar to quickly find specific reminders</li>
-          </ul>
-        </div>
-
-        {/* Emergency Information Section */}
-        <div style={{ 
-          marginTop: '20px', 
-          padding: '20px', 
-          backgroundColor: '#fef2f2', 
-          border: '2px solid #fecaca',
-          borderRadius: '8px' 
-        }}>
-          <h3 
-            style={{ 
-              fontSize: '18px', 
-              fontWeight: '600', 
-              color: '#b91c1c',
-              marginBottom: '15px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-            tabIndex="0"
-          >
-            <span style={{ fontSize: '24px', marginRight: '10px' }}>🚨</span>
-            Emergency Information
-          </h3>
-          <ul style={{ 
-            color: '#b91c1c',
-            paddingLeft: '20px',
-            fontSize: '14px'
-          }}>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Never skip important medications without consulting your doctor</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">If you miss a dose, follow your doctor's instructions</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Keep a backup supply of critical medications</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Inform emergency responders of your medications</li>
-            <li tabIndex="0">Contact your doctor immediately if you experience severe side effects</li>
-          </ul>
+          </div>
+          <div className="p-16 bg-[#020617] text-white rounded-[4rem] border-l-[16px] border-rose-600">
+            <span className="text-rose-500 font-black uppercase tracking-[0.5em] text-[12px] mb-4 block">Manual Override</span>
+            <h4 className="text-4xl font-black tracking-tighter mb-10">Emergency Help</h4>
+            <p className="text-xl text-slate-400 font-bold mb-12 italic opacity-80 leading-relaxed">If you feel very unwell or have severe symptoms, call 1-0-8 immediately.</p>
+            <a href="tel:108" className="block py-8 bg-rose-600 text-white rounded-[2rem] text-center font-black text-[13px] uppercase tracking-[0.5em] shadow-[0_20px_50px_-10px_rgba(225,29,72,0.4)] hover:bg-rose-700 transition-all">Emergency Sync: 108</a>
+          </div>
         </div>
       </div>
-    </div>
+
+      {showTimePicker && (
+        <TimePickerModal
+          reminder={tempReminder}
+          setReminder={setTempReminder}
+          onSave={handleSaveReminder}
+          onClose={() => setShowTimePicker(false)}
+          isEditing={!!editingReminder}
+        />
+      )}
+    </motion.div>
   );
 };
 

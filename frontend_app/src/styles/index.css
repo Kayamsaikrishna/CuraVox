@@ -1,45 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Ensure proper background and text visibility */
+:root {
+  --font-size-multiplier: 1;
+  --accessibility-font-size: calc(1rem * var(--font-size-multiplier));
+
+  /* Brand-Synchronized Palette (Based on logo.jpeg) */
+  --brand-blue: #1a365d;
+  /* Deep Clinical Blue */
+  --brand-green: #76a04e;
+  /* Medicinal Green */
+  --primary: var(--brand-blue);
+  --primary-light: #2c4e7a;
+  --secondary: var(--brand-green);
+  --background: #fcfdfd;
+  /* Surgical White */
+  --surface: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+
+  --text-main: #0f172a;
+  /* Slate 900 */
+  --text-muted: #64748b;
+  /* Slate 500 */
+
+  /* Soft Premium Shadows */
+  --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+}
+
 body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: #f9fafb; /* Tailwind's bg-gray-50 */
-  color: #1f2937; /* Tailwind's text-gray-800 */
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--background);
+  color: var(--text-main);
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-size: var(--accessibility-font-size);
+  letter-spacing: -0.01em;
+  line-height: 1.6;
 }
 
-/* Prevent black screen issues */
-#root {
-  min-height: 100vh;
-  background-color: #f9fafb;
-  width: 100%;
-}
-
+#root,
 .App {
   min-height: 100vh;
-  background-color: #f9fafb;
-  width: 100%;
 }
 
-/* Ensure content is visible even if components fail */
-* {
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
+@layer components {
+
+  /* Glassmorphism Classes */
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-xl border border-white/40 rounded-[2rem] p-8 transition-all duration-500;
+    box-shadow: var(--shadow-glass);
+  }
+
+  .glass-card:hover {
+    @apply bg-white/90 border-teal-100/50;
+    box-shadow: 0 25px 50px -12px rgba(13, 148, 136, 0.1);
+    transform: translateY(-4px);
+  }
+
+  .premium-header {
+    @apply text-3xl font-extrabold tracking-tight text-slate-900 mb-8 flex items-center gap-4;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  .btn-premium {
+    @apply px-8 py-4 rounded-2xl font-bold transition-all duration-300 active:scale-95 flex items-center justify-center gap-3 shadow-lg;
+  }
+
+  /* Subtle indicator for active AI */
+  .ai-pulse {
+    @apply relative flex h-3 w-3;
+  }
+
+  .ai-pulse-dot {
+    @apply animate-ping absolute inline-flex h-full w-full rounded-full opacity-75;
+    background-color: var(--brand-green);
+  }
+
+  .ai-pulse-inner {
+    @apply relative inline-flex rounded-full h-3 w-3;
+    background-color: var(--brand-green);
+  }
 }
 
-:root {
-  --font-size-multiplier: 1;
-  --accessibility-font-size: calc(1rem * var(--font-size-multiplier));
+/* Accessibility */
+.screen-reader-friendly * {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 4px !important;
 }
 
-/* High contrast theme */
-.high-contrast {
-  --tw-border-opacity: 1 !important;
-  border-color: rgba(0, 0, 0, var(--tw-border-opacity)) !important;
+.focus-outline:focus {
+  @apply ring-4 outline-none;
+  --tw-ring-color: rgba(26, 54, 93, 0.2);
+  border-color: var(--brand-blue);
 }
 
 .high-contrast body {
@@ -47,95 +104,20 @@ body {
   color: #000000 !important;
 }
 
-.high-contrast a,
-.high-contrast button,
-.high-contrast input,
-.high-contrast select,
-.high-contrast textarea {
-  background-color: #ffffff !important;
-  color: #000000 !important;
-  border: 2px solid #000000 !important;
+/* Custom Scrollbar for Premium Feel */
+::-webkit-scrollbar {
+  width: 8px;
 }
 
-.high-contrast .btn-primary {
-  background-color: #0000ff !important;
-  color: #ffffff !important;
-  border: 2px solid #000000 !important;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* Screen reader friendly adjustments */
-.screen-reader-friendly * {
-  outline: 2px solid #0000ff !important;
-  outline-offset: 2px !important;
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
 }
 
-/* Reduce motion for users with vestibular disorders */
-.reduce-motion *,
-.reduce-motion *::before,
-.reduce-motion *::after {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
-}
-
-/* Custom focus indicators for better accessibility */
-.focus-outline:focus {
-  outline: 2px solid #4F46E5;
-  outline-offset: 2px;
-}
-
-/* Typography adjustments */
-body {
-  font-size: var(--accessibility-font-size);
-  line-height: 1.6;
-}
-
-h1, h2, h3, h4, h5, h6 {
-  line-height: 1.3;
-}
-
-/* Increase tap targets for mobile accessibility */
-.btn, .link {
-  min-height: 44px;
-  min-width: 44px;
-}
-
-/* Better color contrast */
-.text-low-contrast {
-  color: #6B7280;
-}
-
-.text-medium-contrast {
-  color: #4B5563;
-}
-
-.text-high-contrast {
-  color: #1F2937;
-}
-
-/* Dark mode adjustments */
-.dark .high-contrast {
-  --tw-border-opacity: 1 !important;
-  border-color: rgba(255, 255, 255, var(--tw-border-opacity)) !important;
-}
-
-.dark .high-contrast body {
-  background-color: #000000 !important;
-  color: #ffffff !important;
-}
-
-.dark .high-contrast a,
-.dark .high-contrast button,
-.dark .high-contrast input,
-.dark .high-contrast select,
-.dark .high-contrast textarea {
-  background-color: #000000 !important;
-  color: #ffffff !important;
-  border: 2px solid #ffffff !important;
-}
-
-.dark .high-contrast .btn-primary {
-  background-color: #6366F1 !important;
-  color: #ffffff !important;
-  border: 2px solid #ffffff !important;
+::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
 }

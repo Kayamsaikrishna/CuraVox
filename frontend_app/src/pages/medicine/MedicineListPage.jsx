@@ -1,669 +1,308 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import Search from '../../components/common/Search';
-import { Button } from '../../components/common/Button';
-import useAccessibility from '../../hooks/useAccessibility';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppData } from '../../contexts/AppDataContext';
+import useAccessibility from '../../hooks/useAccessibility';
 import MedicineInteractionChecker from '../../components/medicine/MedicineInteractionChecker';
 import PillIdentificationGame from '../../components/medicine/PillIdentificationGame';
+import ManualMedicineEntry from '../../components/medicine/ManualMedicineEntry';
+
+// --- Ultra-Prism Icons ---
+const IconPill = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /><path d="m8.5 8.5 7 7" /></svg>
+);
+const IconShield = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+);
+const IconAlert = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+);
+const IconPlus = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+);
+const IconSearch = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+);
 
 const MedicineListPage = () => {
+  const navigate = useNavigate();
   const { state, actions } = useAppData();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all'); // all, active, expired
-  const [sortBy, setSortBy] = useState('name'); // name, expiry, dosage
-  const [showInteractionChecker, setShowInteractionChecker] = useState(false);
-  const [showPillGame, setShowPillGame] = useState(false);
-  const [selectedMedicines, setSelectedMedicines] = useState([]);
   const { speak } = useAccessibility();
+  const mainRef = useRef(null);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
+  const [activeTab, setActiveTab] = useState('inventory');
+  const [showManualForm, setShowManualForm] = useState(false);
 
   useEffect(() => {
-    // Load medicines if not already loaded - checking for empty state to fetch real data
-    // (Real fetch logic would go here, currently we just leave it empty if no backend data)
-    if (state.medicines.length === 0) {
-      // Formerly injected dummy data here. Now keeps it empty.
-      actions.setLoading('medicines', false);
-    }
-  }, [state.medicines.length, actions]);
+    if (mainRef.current) mainRef.current.focus();
+    actions.refreshAll();
+    speak('Entering Medicine Vault. View your medications below.');
+  }, []);
 
-  const handleSearch = (term) => {
-    setSearchTerm(term);
-  };
-
-  const handleDetailsClick = (medicineId) => {
-    window.location.hash = `#/medicines/${medicineId}`;
-  };
-
-  const handleSetReminder = (medicine) => {
-    speak(`Reminder set for ${medicine.name}. ${medicine.dosage}`);
-    // In a real app, this would set an actual reminder
-    alert(`Reminder set for ${medicine.name}: ${medicine.dosage}`);
-  };
-
-  const handleAddMedicine = () => {
-    speak('Adding new medicine');
-    window.location.hash = `#/scan`;
-  };
-
-  const toggleMedicineSelection = (medicineId) => {
-    if (selectedMedicines.includes(medicineId)) {
-      setSelectedMedicines(selectedMedicines.filter(id => id !== medicineId));
-    } else {
-      setSelectedMedicines([...selectedMedicines, medicineId]);
-    }
-  };
-
-  const toggleInteractionChecker = () => {
-    const newState = !showInteractionChecker;
-    setShowInteractionChecker(newState);
-    speak(newState ? 'Medicine interaction checker opened' : 'Medicine interaction checker closed');
-  };
-
-  const togglePillGame = () => {
-    const newState = !showPillGame;
-    setShowPillGame(newState);
-    speak(newState ? 'Pill identification game opened' : 'Pill identification game closed');
-  };
-
-  // Filter medicines based on search term and filter
   const filteredMedicines = state.medicines.filter(medicine => {
     const matchesSearch = !searchTerm ||
       medicine.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (medicine.activeIngredients &&
-        medicine.activeIngredients.some(ingredient =>
-          ingredient.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      ) ||
       medicine.category.toLowerCase().includes(searchTerm.toLowerCase());
 
     let matchesFilter = true;
-    if (filter === 'active') {
-      matchesFilter = new Date(medicine.expiryDate) > new Date();
-    } else if (filter === 'expired') {
-      matchesFilter = new Date(medicine.expiryDate) <= new Date();
-    }
+    if (filter === 'active') matchesFilter = new Date(medicine.expiryDate) > new Date();
+    else if (filter === 'expired') matchesFilter = new Date(medicine.expiryDate) <= new Date();
 
     return matchesSearch && matchesFilter;
   });
 
-  // Sort medicines
   const sortedMedicines = [...filteredMedicines].sort((a, b) => {
-    if (sortBy === 'name') {
-      return a.name.localeCompare(b.name);
-    } else if (sortBy === 'expiry') {
-      return new Date(a.expiryDate) - new Date(b.expiryDate);
-    } else if (sortBy === 'dosage') {
-      return a.frequency.localeCompare(b.frequency);
-    }
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    if (sortBy === 'expiry') return new Date(a.expiryDate) - new Date(b.expiryDate);
     return 0;
   });
 
-  // Calculate statistics
-  const activeMedicines = state.medicines.filter(med => new Date(med.expiryDate) > new Date()).length;
-  const expiredMedicines = state.medicines.filter(med => new Date(med.expiryDate) <= new Date()).length;
-  const totalMedicines = state.medicines.length;
-
-  // Function to announce medicine details for screen readers
-  const announceMedicineDetails = (medicine) => {
-    const details = `${medicine.name}. Category: ${medicine.category}. Dosage: ${medicine.dosage}. Expiry: ${new Date(medicine.expiryDate).toLocaleDateString()}. Last taken: ${new Date(medicine.lastTaken).toLocaleDateString()}`;
-    speak(details);
-  };
+  const activeCount = state.medicines.filter(med => new Date(med.expiryDate) > new Date()).length;
+  const expiredCount = state.medicines.filter(med => new Date(med.expiryDate) <= new Date()).length;
 
   return (
-    <div style={{
-      backgroundColor: '#f0f9ff',
-      minHeight: '100vh',
-      padding: '20px',
-      fontFamily: 'Arial, sans-serif',
-      lineHeight: '1.6'
-    }}>
-      {/* Screen reader announcement area */}
-      <div
-        aria-live="polite"
-        aria-atomic="true"
-        style={{
-          position: 'absolute',
-          left: '-10000px',
-          width: '1px',
-          height: '1px',
-          overflow: 'hidden'
-        }}
-      />
-
-      <div style={{
-        maxWidth: '1000px',
-        margin: '0 auto',
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        padding: '30px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        border: '2px solid #3b82f6'
-      }}>
-        <header style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h1
-            style={{
-              fontSize: '28px',
-              fontWeight: 'bold',
-              color: '#1e40af',
-              marginBottom: '10px',
-              borderBottom: '3px solid #3b82f6',
-              paddingBottom: '10px'
-            }}
-            tabIndex="0"
-          >
-            My Medicines
-          </h1>
-          <p
-            style={{
-              fontSize: '16px',
-              color: '#4b5563',
-              fontStyle: 'italic'
-            }}
-            tabIndex="0"
-          >
-            Manage your medications and get important information at a glance
-          </p>
-        </header>
-
-        {/* Action Bar */}
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '15px',
-          marginBottom: '25px',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{ flex: '1', minWidth: '250px' }}>
-            <Search
-              placeholder="Search medicines by name, ingredient, or category..."
-              onSearch={handleSearch}
-              style={{ width: '100%', padding: '10px' }}
-            />
-          </div>
-          <button
-            onClick={handleAddMedicine}
-            style={{
-              padding: '12px 20px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: '2px solid #2563eb',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '16px'
-            }}
-            tabIndex="0"
-          >
-            Add New Medicine
-          </button>
-        </div>
-
-        {/* Filters and Sorting */}
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '15px',
-          marginBottom: '25px',
-          padding: '15px',
-          backgroundColor: '#f0f9ff',
-          borderRadius: '8px',
-          border: '2px solid #bae6fd'
-        }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', color: '#1e40af' }}>Filter:</label>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              style={{
-                padding: '8px',
-                border: '2px solid #3b82f6',
-                borderRadius: '4px',
-                backgroundColor: 'white',
-                color: '#1e40af',
-                fontSize: '14px'
-              }}
-              tabIndex="0"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-screen bg-[#f8fafc] text-[#020617] pb-32 font-sans selection:bg-indigo-100 outline-none"
+      ref={mainRef}
+      tabIndex="-1"
+    >
+      {/* Ultra-Prism Header */}
+      <header className="relative bg-white/80 backdrop-blur-2xl border-b border-slate-200 px-10 py-20 overflow-hidden">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-50/50 rounded-full blur-[120px] -mr-64 -mt-64"></div>
+        <div className="max-w-6xl mx-auto relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-12">
+          <div className="max-w-3xl">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-4 mb-6"
             >
-              <option value="all">All Medicines</option>
-              <option value="active">Active Medicines</option>
-              <option value="expired">Expired Medicines</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', color: '#1e40af' }}>Sort By:</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              style={{
-                padding: '8px',
-                border: '2px solid #3b82f6',
-                borderRadius: '4px',
-                backgroundColor: 'white',
-                color: '#1e40af',
-                fontSize: '14px'
-              }}
-              tabIndex="0"
-            >
-              <option value="name">Name</option>
-              <option value="expiry">Expiry Date</option>
-              <option value="dosage">Frequency</option>
-            </select>
-          </div>
-
-          <button
-            onClick={toggleInteractionChecker}
-            style={{
-              padding: '12px 15px',
-              backgroundColor: '#8b5cf6',
-              color: 'white',
-              border: '2px solid #7c3aed',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '14px',
-              alignSelf: 'flex-end'
-            }}
-            tabIndex="0"
-          >
-            {showInteractionChecker ? 'Hide' : 'Show'} Interaction Checker
-          </button>
-
-          <button
-            onClick={togglePillGame}
-            style={{
-              padding: '12px 15px',
-              backgroundColor: '#10b981',
-              color: 'white',
-              border: '2px solid #059669',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '14px',
-              alignSelf: 'flex-end'
-            }}
-            tabIndex="0"
-          >
-            {showPillGame ? 'Hide' : 'Show'} Pill Game
-          </button>
-        </div>
-
-        {/* Stats Cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '15px',
-          marginBottom: '25px'
-        }}>
-          <div style={{
-            padding: '15px',
-            backgroundColor: '#dbeafe',
-            border: '2px solid #3b82f6',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e40af' }}>{totalMedicines}</div>
-            <div style={{ color: '#1e40af', fontWeight: '500' }}>Total Medicines</div>
-          </div>
-          <div style={{
-            padding: '15px',
-            backgroundColor: '#dcfce7',
-            border: '2px solid #22c55e',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#16a34a' }}>{activeMedicines}</div>
-            <div style={{ color: '#16a34a', fontWeight: '500' }}>Active Medicines</div>
-          </div>
-          <div style={{
-            padding: '15px',
-            backgroundColor: '#fed7aa',
-            border: '2px solid #f97316',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ea580c' }}>{expiredMedicines}</div>
-            <div style={{ color: '#ea580c', fontWeight: '500' }}>Expired Medicines</div>
-          </div>
-        </div>
-
-        {/* Interaction Checker Panel */}
-        {showInteractionChecker && (
-          <div style={{
-            marginBottom: '25px',
-            padding: '20px',
-            backgroundColor: '#ede9fe',
-            border: '2px solid #8b5cf6',
-            borderRadius: '8px'
-          }}>
-            <h2 style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              color: '#7c3aed',
-              marginBottom: '15px',
-              display: 'flex',
-              alignItems: 'center'
-            }}>
-              <span style={{ fontSize: '24px', marginRight: '10px' }}>⚠️</span>
-              Medicine Interaction Checker
-            </h2>
-            <MedicineInteractionChecker />
-          </div>
-        )}
-
-        {/* Pill Identification Game Panel */}
-        {showPillGame && (
-          <div style={{
-            marginBottom: '25px',
-            padding: '20px',
-            backgroundColor: '#f0fdf4',
-            border: '2px solid #4ade80',
-            borderRadius: '8px'
-          }}>
-            <h2 style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              color: '#16a34a',
-              marginBottom: '15px',
-              display: 'flex',
-              alignItems: 'center'
-            }}>
-              <span style={{ fontSize: '24px', marginRight: '10px' }}>🎯</span>
-              Pill Identification Game
-            </h2>
-            <PillIdentificationGame />
-          </div>
-        )}
-
-        {/* Loading State */}
-        {state.loading.medicines && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '40px',
-            textAlign: 'center'
-          }}>
-            <div>
-              <div style={{
-                fontSize: '24px',
-                color: '#3b82f6',
-                marginBottom: '10px'
-              }}>Loading medicines...</div>
-              <div style={{ color: '#6b7280' }}>Please wait while we load your medicine information</div>
-            </div>
-          </div>
-        )}
-
-        {/* Error State */}
-        {error && (
-          <div style={{
-            padding: '20px',
-            backgroundColor: '#fee2e2',
-            border: '2px solid #ef4444',
-            borderRadius: '8px',
-            color: '#dc2626',
-            textAlign: 'center',
-            marginBottom: '20px'
-          }}>
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!state.loading.medicines && state.medicines.length === 0 && (
-          <div style={{
-            padding: '40px',
-            textAlign: 'center',
-            backgroundColor: '#f9fafb',
-            border: '2px dashed #d1d5db',
-            borderRadius: '8px'
-          }}>
-            <div style={{ fontSize: '24px', color: '#6b7280', marginBottom: '10px' }}>No Medicines Found</div>
-            <p style={{ color: '#6b7280', marginBottom: '20px' }}>
-              You don't have any medicines saved yet. Scan a medicine package to get started.
+              <div className="w-3 h-10 bg-gradient-to-b from-indigo-600 to-indigo-400 rounded-full shadow-[0_0_20px_rgba(79,70,229,0.3)]"></div>
+              <span className="text-[12px] font-black text-indigo-600 uppercase tracking-[0.5em]">Medicine Tracker</span>
+            </motion.div>
+            <h1 className="text-8xl font-black text-[#020617] tracking-tighter leading-[0.9] mb-8">
+              Medicine <span className="text-indigo-600">Vault</span>
+            </h1>
+            <p className="text-2xl text-slate-500 font-bold leading-relaxed italic opacity-80 border-l-4 border-indigo-100 pl-8">
+              Easily manage your medications and track interactions.
             </p>
-            <button
-              onClick={handleAddMedicine}
-              style={{
-                padding: '12px 24px',
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: '2px solid #2563eb',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '16px'
-              }}
-              tabIndex="0"
-            >
-              Scan Medicine
-            </button>
           </div>
-        )}
-
-        {/* Medicine List */}
-        {!state.loading.medicines && state.medicines.length > 0 && (
-          <>
-            <div style={{ marginBottom: '15px' }}>
-              <p style={{ color: '#4b5563' }}>
-                Showing {sortedMedicines.length} of {state.medicines.length} medicines
-              </p>
-            </div>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-              gap: '20px',
-              marginBottom: '25px'
-            }}>
-              {sortedMedicines.map((medicine) => {
-                const isExpired = new Date(medicine.expiryDate) <= new Date();
-                return (
-                  <div
-                    key={medicine.id}
-                    style={{
-                      border: `2px solid ${isExpired ? '#ef4444' : '#3b82f6'}`,
-                      borderRadius: '8px',
-                      padding: '20px',
-                      backgroundColor: 'white',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
-                      <div>
-                        <h3
-                          style={{
-                            fontSize: '18px',
-                            fontWeight: '600',
-                            color: isExpired ? '#dc2626' : '#1e40af',
-                            marginBottom: '5px'
-                          }}
-                          tabIndex="0"
-                        >
-                          {medicine.name}
-                        </h3>
-                        <p style={{ color: '#6b7280', fontSize: '14px' }}>
-                          {medicine.category} • {medicine.manufacturer}
-                        </p>
-                        {isExpired && (
-                          <div style={{
-                            backgroundColor: '#fee2e2',
-                            color: '#dc2626',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            display: 'inline-block',
-                            marginTop: '5px'
-                          }}>
-                            EXPIRED
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => announceMedicineDetails(medicine)}
-                        style={{
-                          backgroundColor: '#f0f9ff',
-                          border: '2px solid #3b82f6',
-                          borderRadius: '50%',
-                          width: '36px',
-                          height: '36px',
-                          cursor: 'pointer',
-                          fontSize: '16px'
-                        }}
-                        tabIndex="0"
-                        aria-label={`Read details for ${medicine.name}`}
-                      >
-                        🔊
-                      </button>
-                    </div>
-
-                    <div style={{ marginBottom: '15px' }}>
-                      <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Active Ingredients:</p>
-                      <p style={{ color: '#6b7280' }}>{medicine.activeIngredients.join(', ')}</p>
-                    </div>
-
-                    <div style={{ marginBottom: '15px' }}>
-                      <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Dosage:</p>
-                      <p style={{ color: '#6b7280' }}>{medicine.dosage}</p>
-                    </div>
-
-                    <div style={{ marginBottom: '15px' }}>
-                      <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Usage:</p>
-                      <p style={{ color: '#6b7280' }}>{medicine.usage}</p>
-                    </div>
-
-                    <div style={{ marginBottom: '15px' }}>
-                      <p style={{ fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Expiry Date:</p>
-                      <p style={{ color: isExpired ? '#dc2626' : '#6b7280' }}>
-                        {new Date(medicine.expiryDate).toLocaleDateString()}
-                      </p>
-                    </div>
-
-                    <div style={{
-                      display: 'flex',
-                      gap: '10px',
-                      flexWrap: 'wrap',
-                      paddingTop: '15px',
-                      borderTop: '1px solid #e5e7eb'
-                    }}>
-                      <button
-                        onClick={() => handleDetailsClick(medicine.id)}
-                        style={{
-                          padding: '8px 12px',
-                          backgroundColor: '#3b82f6',
-                          color: 'white',
-                          border: '2px solid #2563eb',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          flex: 1,
-                          minWidth: '100px'
-                        }}
-                        tabIndex="0"
-                      >
-                        View Details
-                      </button>
-
-                      <button
-                        onClick={() => handleSetReminder(medicine)}
-                        style={{
-                          padding: '8px 12px',
-                          backgroundColor: '#10b981',
-                          color: 'white',
-                          border: '2px solid #059669',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          flex: 1,
-                          minWidth: '100px'
-                        }}
-                        tabIndex="0"
-                      >
-                        Set Reminder
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {/* Emergency Information Section */}
-        <div style={{
-          marginTop: '30px',
-          padding: '20px',
-          backgroundColor: '#fef2f2',
-          border: '2px solid #fecaca',
-          borderRadius: '8px'
-        }}>
-          <h3
-            style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: '#b91c1c',
-              marginBottom: '15px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-            tabIndex="0"
+          <motion.button
+            whileHover={{ scale: 1.05, translateY: -4 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowManualForm(true)}
+            className="group px-12 py-8 bg-[#020617] text-white rounded-[3rem] font-black text-[13px] uppercase tracking-[0.4em] shadow-[0_30px_60px_-15px_rgba(2,6,23,0.3)] hover:bg-slate-800 transition-all flex items-center gap-6 relative overflow-hidden"
           >
-            <span style={{ fontSize: '24px', marginRight: '10px' }}>🚨</span>
-            Emergency Information
-          </h3>
-          <ul style={{
-            color: '#b91c1c',
-            paddingLeft: '20px',
-            fontSize: '14px'
-          }}>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Call emergency services if experiencing severe allergic reactions</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Keep a list of all medications for emergency responders</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Know the location of your emergency medications</li>
-            <li tabIndex="0">Contact your doctor immediately if experiencing severe side effects</li>
-          </ul>
+            <IconPlus /> Add Medicine
+          </motion.button>
         </div>
+      </header>
 
-        {/* Accessibility Tips */}
-        <div style={{
-          marginTop: '20px',
-          padding: '20px',
-          backgroundColor: '#e0f2fe',
-          border: '2px solid #0ea5e9',
-          borderRadius: '8px'
-        }}>
-          <h3
-            style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: '#0284c7',
-              marginBottom: '15px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-            tabIndex="0"
-          >
-            <span style={{ fontSize: '24px', marginRight: '10px' }}>ℹ️</span>
-            Medicine Management Tips
-          </h3>
-          <ul style={{
-            color: '#0284c7',
-            paddingLeft: '20px',
-            fontSize: '14px'
-          }}>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Always check expiry dates before taking any medicine</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Store medicines in a cool, dry place away from direct sunlight</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Follow the prescribed dosage and timing for best results</li>
-            <li style={{ marginBottom: '8px' }} tabIndex="0">Use the reminder feature to stay on schedule</li>
-            <li tabIndex="0">Contact your healthcare provider if you experience severe side effects</li>
-          </ul>
+      <div className="max-w-6xl mx-auto px-10 mt-16">
+        <AnimatePresence mode="wait">
+          {showManualForm ? (
+            <motion.div
+              key="manual-form"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.05 }}
+              className="py-12"
+            >
+              <ManualMedicineEntry
+                onCancel={() => setShowManualForm(false)}
+                onSuccess={() => {
+                  setShowManualForm(false);
+                  actions.refreshAll();
+                }}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="vault-content"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              {/* Secondary Controls */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-16 items-center">
+                <div className="lg:col-span-8 relative group">
+                  <div className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors">
+                    <IconSearch />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search medicines by name or category..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-20 pr-10 py-7 bg-white border border-slate-100 rounded-[3rem] shadow-[0_15px_40px_-15px_rgba(0,0,0,0.05)] outline-none focus:ring-8 focus:ring-indigo-600/5 focus:border-indigo-600/20 font-black text-slate-800 placeholder:text-slate-300 transition-all text-xl"
+                  />
+                </div>
+                <div className="lg:col-span-4 flex bg-white p-2 rounded-[2.5rem] shadow-sm border border-slate-100">
+                  {['inventory', 'analysis', 'training'].map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`flex-1 py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-900'
+                        }`}
+                    >
+                      {tab === 'training' ? '🎯 Quiz' : tab === 'analysis' ? 'Interactions' : 'Medications'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* View Rendering */}
+              <AnimatePresence mode="wait">
+                {activeTab === 'inventory' && (
+                  <motion.div
+                    key="inventory"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    {/* Analytics Summary */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+                      {[
+                        { label: 'Total Medicines', val: state.medicines.length, color: 'text-indigo-600', bg: 'bg-indigo-50/50' },
+                        { label: 'Active Reminders', val: activeCount, color: 'text-emerald-600', bg: 'bg-emerald-50/50' },
+                        { label: 'Expired', val: expiredCount, color: 'text-rose-600', bg: 'bg-rose-50/50' }
+                      ].map((stat, i) => (
+                        <div key={i} className={`${stat.bg} p-10 rounded-[3rem] border border-white flex justify-between items-center`}>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{stat.label}</p>
+                            <p className={`text-5xl font-black ${stat.color} tracking-tighter`}>{stat.val}</p>
+                          </div>
+                          <div className="opacity-10 scale-150 rotate-12"><IconPill /></div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Filter Strip */}
+                    <div className="flex justify-between items-center mb-10 px-4">
+                      <div className="flex gap-4">
+                        {['all', 'active', 'expired'].map(t => (
+                          <button
+                            key={t}
+                            onClick={() => setFilter(t)}
+                            className={`px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all ${filter === t ? 'bg-[#020617] text-white shadow-xl' : 'text-slate-400 hover:text-indigo-600'}`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="bg-transparent font-black text-[10px] uppercase tracking-widest text-slate-400 outline-none cursor-pointer"
+                      >
+                        <option value="name">Sort: Name</option>
+                        <option value="expiry">Sort: Expiry</option>
+                      </select>
+                    </div>
+
+                    {/* Grid */}
+                    {sortedMedicines.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                        {sortedMedicines.map((medicine, idx) => {
+                          const isExpired = new Date(medicine.expiryDate) <= new Date();
+                          return (
+                            <motion.div
+                              key={medicine.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: idx * 0.05 }}
+                              whileHover={{ y: -8 }}
+                              onClick={() => navigate(`/medicines/${medicine.id}`)}
+                              className="group bg-white rounded-[4rem] p-10 border border-slate-50 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.03)] hover:shadow-[0_40px_100px_-20px_rgba(79,70,229,0.12)] transition-all cursor-pointer overflow-hidden flex flex-col min-h-[440px]"
+                            >
+                              <div className="flex justify-between items-start mb-10">
+                                <span className={`text-[10px] font-black uppercase tracking-[0.4em] ${isExpired ? 'text-rose-500' : 'text-indigo-600'}`}>
+                                  {medicine.category || 'Medication'}
+                                </span>
+                                <div className={`w-3 h-3 rounded-full ${isExpired ? 'bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,1)]' : 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]'}`}></div>
+                              </div>
+                              <h3 className="text-4xl font-black text-[#020617] tracking-tighter leading-none mb-6 group-hover:text-indigo-600 transition-colors uppercase">
+                                {medicine.name}
+                              </h3>
+                              <div className="space-y-4 flex-1">
+                                <div className="flex items-center gap-4 text-slate-300">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-current"></div>
+                                  <p className="text-[12px] font-black uppercase tracking-widest">{medicine.dosage}</p>
+                                </div>
+                                <p className="text-[11px] font-bold text-slate-400 italic mb-8">{medicine.frequency}</p>
+                                <div className={`mt-auto p-6 rounded-3xl border-2 ${isExpired ? 'border-rose-100 bg-rose-50/20 text-rose-600' : 'border-indigo-100 bg-indigo-50/20 text-indigo-600'}`}>
+                                  <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1">Expiry Date</p>
+                                  <p className="font-black tracking-tight">{new Date(medicine.expiryDate).toLocaleDateString()}</p>
+                                </div>
+                              </div>
+                              <div className="mt-8 pt-8 border-t border-slate-50 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-0 -translate-x-4">
+                                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.4em]">View Details</span>
+                                <div className="w-10 h-10 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600"><IconPlus /></div>
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="py-32 text-center bg-white rounded-[4rem] border-2 border-dashed border-slate-100">
+                        <div className="w-24 h-24 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-8 text-slate-200"><IconSearch /></div>
+                        <h3 className="text-4xl font-black text-slate-900 tracking-tighter mb-4">No Medicines Found</h3>
+                        <p className="text-lg text-slate-400 font-bold mb-10 italic">Your vault is clear at current filter coordinates.</p>
+                        <button onClick={() => setSearchTerm('')} className="px-12 py-6 bg-indigo-600 text-white rounded-full font-black text-[12px] uppercase tracking-widest shadow-xl">Reset Search</button>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {activeTab === 'analysis' && (
+                  <motion.div
+                    key="analysis"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    className="bg-white rounded-[5rem] p-20 shadow-2xl border border-slate-50"
+                  >
+                    <h2 className="text-6xl font-black text-[#020617] tracking-tighter mb-16 italic opacity-20">Interaction Checker</h2>
+                    <MedicineInteractionChecker />
+                  </motion.div>
+                )}
+
+                {activeTab === 'training' && (
+                  <motion.div
+                    key="training"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    className="bg-white rounded-[5rem] p-20 shadow-2xl border border-slate-50"
+                  >
+                    <h2 className="text-6xl font-black text-[#020617] tracking-tighter mb-16 italic opacity-20">Medicine Quiz</h2>
+                    <PillIdentificationGame />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Global Security Directive */}
+        <div className="mt-32 p-16 bg-[#020617] text-white rounded-[4rem] relative overflow-hidden flex flex-col lg:flex-row items-center gap-16 shadow-[0_40px_100px_-20px_rgba(2,6,23,0.4)]">
+          <div className="absolute top-0 right-0 p-12 opacity-5 scale-150"><IconShield /></div>
+          <div className="w-32 h-32 bg-rose-600 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl animate-pulse">
+            <IconAlert />
+          </div>
+          <div className="flex-1">
+            <span className="text-rose-500 font-black uppercase tracking-[0.5em] text-[11px] mb-4 block">Emergency Support</span>
+            <h4 className="text-4xl font-black tracking-tighter leading-tight max-w-4xl italic opacity-90">
+              Check your medicine labels carefully. If you feel unwell, stop taking the medicine and call for help immediately.
+            </h4>
+          </div>
+          <a href="tel:108" className="px-16 py-8 bg-white text-[#020617] rounded-[3rem] font-black text-[13px] uppercase tracking-[0.4em] shadow-2xl hover:bg-rose-600 hover:text-white transition-all">Connect: 108</a>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
