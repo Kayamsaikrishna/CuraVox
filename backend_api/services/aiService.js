@@ -261,6 +261,20 @@ class AdvancedMedicalAI {
       console.log(`✅ System Core:       ONLINE (PID: ${this.pythonProcess?.pid})`);
       console.log(`✅ Local Brain:       CONNECTED`);
       console.log(`   └─ Model:          ${status.model_details?.active_llm}`);
+
+      const models = status.model_details?.available_models || [];
+      if (models.length > 0) {
+        console.log(`   └─ Available:      ${models.join(', ')}`);
+      }
+
+      // Hardware & Cloud Status
+      console.log(`✅ Acceleration:      ${status.gpu_status || 'UNKNOWN'}`);
+
+      const geminiStatus = process.env.GEMINI_API_KEY
+        ? "ONLINE (Gemini 2.5 Flash Lite)"
+        : "OFFLINE (No API Key)";
+      console.log(`✅ Cloud Vision:      ${geminiStatus}`);
+
       console.log('----------------------------------------\n');
 
       return status;

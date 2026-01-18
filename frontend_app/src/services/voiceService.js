@@ -165,27 +165,37 @@ class VoiceService {
     // 3. INTELLIGENT NAVIGATION & LOCAL COMMANDS (PRIORITY OVER PASSIVE MODE)
     // "Go home", "Take me to settings", "Open camera" — Always active
 
+    // A. Fuzzy Action Matching (Do specific tasks based on keywords)
+    // This allows "Can you upload?" or "Go to upload" to trigger the action
+    const actionKeywords = [
+      { keywords: ['upload', 'picker', 'gallery'], action: () => this.uploadImage() },
+      { keywords: ['start scan', 'open camera', 'take photo', 'capture'], action: () => this.startScanning() },
+      { keywords: ['stop scan', 'close camera'], action: () => this.stopScanning() },
+      { keywords: ['capture', 'snap', 'click photo'], action: () => this.captureImage() },
+      { keywords: ['help', 'commands', 'what can you do'], action: () => this.provideHelp() },
+      { keywords: ['emergency', 'call ambulance', 'call doctor', 'help me'], action: () => this.callEmergency() }
+    ];
 
-    // Check Navigation
-    for (const [key, route] of Object.entries(this.navMap)) {
-      if (lowerCommand.includes(key) && (lowerCommand.includes('go') || lowerCommand.includes('open') || lowerCommand.includes('show'))) {
-        console.log(`📍 Fuzzy Nav Match: ${key} -> ${route}`);
-        this.navigateTo(route);
+    for (const item of actionKeywords) {
+      if (item.keywords.some(k => lowerCommand.includes(k))) {
+        console.log(`⚡ Action Triggered by keyword: ${item.keywords[0]}`);
+        item.action();
         return;
       }
     }
 
-    // Check Scanning
-    if (lowerCommand.includes('scan') || lowerCommand.includes('camera')) {
-      if (lowerCommand.includes('stop') || lowerCommand.includes('close')) this.stopScanning();
-      else this.startScanning();
-      return;
-    }
-
-    // Check Local Dict (Exact fallback)
-    if (this.commands.has(lowerCommand)) {
-      this.commands.get(lowerCommand)();
-      return;
+    // B. Fuzzy Navigation Matching
+    // "Go to scan", "Open profile"
+    for (const [key, route] of Object.entries(this.navMap)) {
+      if (lowerCommand.includes(key)) {
+        // Less strict: don't strictly require 'go' if the intent is clear contextually or it's a direct place name
+        // But to avoid false positives in chat, we usually check for 'go' OR if it's a very specific keyword like "dashboard"
+        if (lowerCommand.includes('go') || lowerCommand.includes('open') || lowerCommand.includes('show') || key.length > 5) {
+          console.log(`📍 Fuzzy Nav Match: ${key} -> ${route}`);
+          this.navigateTo(route);
+          return;
+        }
+      }
     }
 
     // 4. PASSIVE MODE CHECK (For CHAT Only)
@@ -432,20 +442,28 @@ class VoiceService {
       this.synthesis.speak(utterance);
     } catch (e) {
       console.error("❌ Failed to speak:", e);
-      this.isSpeaking = false;
-      this.shouldSuspendListening = false;
-      if (this.shouldBeListening) this.startListening();
     }
+  } // <--- Closing speak() method
 
-    // Dispatch event
-    window.dispatchEvent(new CustomEvent('voiceOutput', {
-      detail: { text }
-    }));
+  // --- Actions ---
+
+  callEmergency() {
+    this.speak("Initiating Emergency Call to 1 0 8.");
+    setTimeout(() => {
+      window.open('tel:108', '_self');
+    }, 1500);
+  }
+
+  uploadImage() {
+    this.speak("Opening image picker.");
+    // Logic to trigger file input click handled via global event or ref in component
+    // dispatch event
+    window.dispatchEvent(new CustomEvent('voice-action', { detail: 'upload' }));
   }
 
   enterStandbyMode() {
     // Silent Pause
-    // this.speak("Pausing now. Say 'Hello Doctor' to wake me up."); 
+    // this.speak("Pausing now. Say 'Hello Doctor' to wake me up.");
     this.isWakeWordActive = false;
     this.speechQueue = [];
     if (this.synthesis.speaking) this.synthesis.cancel();

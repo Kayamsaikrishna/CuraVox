@@ -35,23 +35,50 @@ class GeminiService {
         const imageBase64 = imageData.toString("base64");
 
         const prompt = `
-            Task: VISUAL MEDICINE IDENTIFICATION
+            You are an expert Pharmacist AI. Your task is to identify medicine from an image with ABSOLUTE accuracy and patient safety in mind.
 
-            Analyze the provided image of a medicine strip/bottle.
-            It may be rotated, partially used, or have small text. Use your domain expertise to reconstruct the full details.
+            🚨 CRITICAL ACCURACY PROTOCOLS 🚨
+            1.  **TEXT OVER VISUALS**: Prioritize reading the actual text printed on the label. Do not identify based purely on box color or shape.
+            2.  **CONTEXTUAL CORROBORATION**: If a name is partially obscured (e.g., "Amox..."), look for the strength (e.g., "500mg") or generic name to verify. Only provide a full name if you are 95%+ certain via these cues.
+            3.  **DOSAGE IS PARAMOUNT**: You MUST extract the numerical strength (mg, ml, mcg, %). Accuracy here is safety-critical.
+            4.  **REJECT AMBIGUITY**: If the main medicine name is unreadable/too blurry, you MUST return the JSON error format below. DO NOT GUESS.
 
-            REQUIRED OUTPUT (JSON):
+            STEP 1: TEXT EXTRACTION
+            - Read MEDICINE NAME (Brand + Generic).
+            - Read STRENGTH/DOSAGE (e.g., 500mg/5ml).
+            - Read MANUFACTURER.
+            - Read EXPIRY (Exp) and MFG Dates.
+
+            STEP 2: CLINICAL ENRICHMENT
+            - Provide Uses, Side Effects, and Safety Warnings from your medical knowledge bank based on the IDENTIFIED name.
+
+            STEP 3: DOCTOR AGENT SPEECH
+            - Generate "patient_friendly_speech" as a warm, professional doctor.
+            
+            REQUIRED OUTPUT (JSON only):
+            
+            [SCENARIO A: Identification Successful]
             {
-              "medicineName": "Brand Name (Generic Name)",
-              "strength": "Dosage (e.g. 500mg)",
-              "manufacturer": "Manufacturer Name",
-              "uses": ["Primary Condition 1", "Condition 2"],
-              "sideEffects": ["Common Side Effect 1", "Side Effect 2"],
-              "warnings": ["Critical Safety Warning 1", "Warning 2"],
-              "doctor_insight": "A brief, 1-sentence clinical insight about this specific medicine (e.g. 'Take with food to minimize stomach upset').",
-              "confidence": 0.95
+              "medicineName": "Full Name",
+              "composition": "Generic/Active Ingredients",
+              "manufacturer": "Company Name",
+              "strength": "Dose (e.g. 500mg)",
+              "dates": { "expiryDate": "MM/YY or Not Visible", "mfgDate": "MM/YY or Not Visible" },
+              "uses": ["Use 1", "Use 2"],
+              "sideEffects": ["Effect 1", "Effect 2"],
+              "safetyAdvice": { "alcohol": "...", "pregnancy": "...", "driving": "..." },
+              "warnings": ["Warning 1"],
+              "typical_schedule": { "frequency": "...", "timing": "..." },
+              "doctor_insight": "A professional clinical summary.",
+              "patient_friendly_speech": "I have identified...",
+              "confidence": 0.98
             }
-        `;
+
+            [SCENARIO B: Unreadable / Blurry / No Medicine]
+            {
+               "error": "The medicine label is not clearly readable. Please hold the package steady in the center of the box and try again."
+            }
+            `;
 
         const requestParts = [
             prompt,
@@ -76,10 +103,15 @@ class GeminiService {
         if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
             const jsonString = text.substring(firstBrace, lastBrace + 1);
             try {
-                return JSON.parse(jsonString);
+                const parsed = JSON.parse(jsonString);
+                // Handle Explicit Error from AI
+                if (parsed.error) {
+                    console.warn("🚫 CLOUD AI REJECTION:", parsed.error);
+                    return parsed; // Return the error object { error: "..." }
+                }
+                return parsed;
             } catch (e) {
                 console.error("JSON Parse Error on extracted string:", e);
-                // Fallback: try cleaning standard markdown just in case
             }
         }
 

@@ -59,6 +59,26 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  phoneNumber: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  address: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  bloodType: {
+    type: String,
+    enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', '', null],
+    default: ''
+  },
+  emergencyContact: {
+    name: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    relation: { type: String, default: '' }
+  },
   lastLoginAt: {
     type: Date,
     default: null

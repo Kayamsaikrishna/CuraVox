@@ -59,23 +59,47 @@ const processImageWithOCR = async (imagePath, options = {}) => {
       // 2. FALLBACK: LOCAL GEMMA 3 MULTIMODAL
       console.log("🚀 Falling back to Local Gemma 3 Vision (Ollama)...");
 
+      // 2. FALLBACK: LOCAL GEMMA 3 MULTIMODAL
+      console.log("🚀 Falling back to Local Gemma 3 Vision (Ollama)...");
+
       const prompt = `
-      Task: VISUAL MEDICINE IDENTIFICATION
-      Analyze this image of a medicine.
-      Return JSON:
+      You are an expert Pharmacist AI. Your task is to identify medicine from an image with ABSOLUTE accuracy and patient safety.
+
+      🚨 CRITICAL ACCURACY PROTOCOLS 🚨
+      1.  **TEXT OVER VISUALS**: Prioritize reading the actual text on the label. Do not guess based on box color.
+      2.  **CONTEXTUAL CORROBORATION**: If a name is partially blurry (e.g., "Amox..."), look for the strength (e.g., "500mg") or generic name to verify. Only return a full name if 95%+ certain.
+      3.  **DOSAGE IS KEY**: You MUST extract the numerical strength (mg, ml, mcg, %). 
+      4.  **REJECT AMBIGUITY**: If the main name is unreadable, return the JSON error format: {"error": "Medicine label not clearly readable"}.
+
+      STEP 1: TEXT EXTRACTION
+      - Medicine Name, Strength, Manufacturer, Dates.
+
+      STEP 2: CLINICAL ENRICHMENT
+      - Provide Uses, Side Effects, and Safety Advice.
+
+      STEP 3: DOCTOR AGENT SPEECH
+      - Generate "patient_friendly_speech" as a warm, professional doctor.
+      
+      REQUIRED OUTPUT (JSON only):
       {
-        "medicineName": "Brand/Generic",
-        "strength": "Dosage",
-        "uses": ["Use 1"],
-        "sideEffects": ["Side Effect 1"],
+        "medicineName": "Full Name",
+        "composition": "Active Ingredients",
+        "manufacturer": "Company Name",
+        "strength": "Dose",
+        "dates": { "expiryDate": "MM/YY or Not Visible", "mfgDate": "MM/YY or Not Visible" },
+        "uses": ["Use 1", "Use 2"],
+        "sideEffects": ["Effect 1", "Effect 2"],
+        "safetyAdvice": { "alcohol": "...", "pregnancy": "...", "driving": "..." },
         "warnings": ["Warning 1"],
+        "typical_schedule": { "frequency": "...", "timing": "..." },
+        "doctor_insight": "A professional clinical summary.",
+        "patient_friendly_speech": "I have identified...",
         "confidence": 0.95
       }
       `;
 
       try {
-        // Call Python Backend which calls Ollama (gemma3:4b)
-        // We pass the raw image path. Python handles base64 encoding.
+        // Call Python Backend
         const visionResult = await medicalAIService.callPythonEngine('analyze_medicine_image', {
           image_path: imagePath,
           prompt: prompt
@@ -84,12 +108,23 @@ const processImageWithOCR = async (imagePath, options = {}) => {
         console.log("🔍 DEBUG: Local Gemma Result:", JSON.stringify(visionResult, null, 2));
 
         if (visionResult && visionResult.raw_response) {
-          // Parse the JSON from the LLM's raw text response
+          // Parse the JSON
           let responseData = {};
           try {
             const jsonMatch = visionResult.raw_response.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
               responseData = JSON.parse(jsonMatch[0]);
+
+              // Handle Explicit Error from AI
+              if (responseData.error) {
+                console.warn("🚫 AI REJECTION:", responseData.error);
+                resolve({
+                  error: responseData.error,
+                  confidence: 0,
+                  engine: 'gemma3:4b (Local)'
+                });
+                return;
+              }
             } else {
               responseData = { medicineName: "Unknown (Parse Error)", raw: visionResult.raw_response };
             }
@@ -105,15 +140,22 @@ const processImageWithOCR = async (imagePath, options = {}) => {
             engine: 'gemma3:4b (Local)',
             engineVersion: 'Ollama',
             medicineName: responseData.medicineName || "Unknown",
+            manufacturer: responseData.manufacturer || "Unknown Manufacturer",
             processedImagePath: imagePath,
             aiAnalysis: {
               identifiedMedicine: responseData.medicineName,
+              composition: responseData.composition,
+              manufacturer: responseData.manufacturer,
+              dates: responseData.dates || { expiryDate: "Not Visible", mfgDate: "Not Visible" },
+              safetyAdvice: responseData.safetyAdvice || {},
+              typical_schedule: responseData.typical_schedule || { frequency: "As prescribed", timing: "Follow doctor's advice" },
               confidence: responseData.confidence || visionResult.confidence,
               dosageInfo: responseData.strength || responseData.dosage,
-              usageInfo: Array.isArray(responseData.uses) ? responseData.uses.join(', ') : responseData.uses,
-              sideEffects: responseData.sideEffects || responseData.side_effects,
+              usageInfo: Array.isArray(responseData.uses) ? responseData.uses : [responseData.uses],
+              sideEffects: Array.isArray(responseData.sideEffects) ? responseData.sideEffects : [responseData.sideEffects],
               warnings: responseData.warnings,
-              recommendations: ["Consult a doctor (Local AI Advice)"]
+              doctor_insight: responseData.doctor_insight || "Consult a doctor for advice.",
+              patient_friendly_speech: responseData.patient_friendly_speech // Map the speech script
             }
           });
           return; // EXIT FUNCTION

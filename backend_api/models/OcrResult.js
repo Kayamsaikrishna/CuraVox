@@ -101,13 +101,39 @@ const ocrResultSchema = new mongoose.Schema({
       type: String,
       required: false
     },
-    usageInfo: {
+    composition: {
+      type: String, // Active Ingredients
+      required: false
+    },
+    manufacturer: {
       type: String,
       required: false
     },
+    usageInfo: [String], // Changed to Array
     sideEffects: [String],
     warnings: [String],
-    recommendations: [String]
+    recommendations: [String],
+    doctor_insight: {
+      type: String,
+      required: false
+    },
+    dates: {
+      expiryDate: String,
+      mfgDate: String
+    },
+    safetyAdvice: {
+      alcohol: String,
+      pregnancy: String,
+      driving: String
+    },
+    typical_schedule: {
+      frequency: String,
+      timing: String
+    },
+    patient_friendly_speech: {
+      type: String,
+      required: false
+    }
   }
 }, {
   timestamps: true,

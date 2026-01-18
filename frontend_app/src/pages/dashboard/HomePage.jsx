@@ -147,6 +147,16 @@ const HomePage = () => {
     },
     {
       id: 5,
+      title: "My Profile",
+      description: "Manage personal & medical info",
+      icon: "👤",
+      link: "/profile",
+      color: "#6366f1",
+      bgColor: "#e0e7ff",
+      shortcut: "Alt+P"
+    },
+    {
+      id: 6,
       title: "Consultation",
       description: "Talk to Dr. CuraVox",
       icon: "👨‍⚕️",
@@ -769,13 +779,15 @@ const HomePage = () => {
         </section>
 
         {/* Emergency Information */}
+        {/* Emergency Information */}
         <section
           id="emergency-section"
           style={{
             padding: '35px',
             backgroundColor: '#fef2f2',
             border: '4px solid #fecaca',
-            borderRadius: '12px'
+            borderRadius: '12px',
+            marginBottom: '80px' // Add spacing for FAB
           }}
           tabIndex="-1"
         >
@@ -788,36 +800,53 @@ const HomePage = () => {
               display: 'flex',
               alignItems: 'center'
             }}
-            tabIndex="0"
           >
-            <span style={{ fontSize: '32px', marginRight: '10px' }}>🚨</span>
+            <span style={{ fontSize: '32px', marginRight: '10px' }}>🚑</span>
             Emergency Information
           </h2>
-          <ul style={{
-            color: '#b91c1c',
-            paddingLeft: '30px',
-            fontSize: '18px',
-            lineHeight: '1.8'
-          }}>
-            <li style={{ marginBottom: '12px' }} tabIndex="0">
-              <strong>Emergency Number:</strong> Call 911 or your local emergency number immediately
-            </li>
-            <li style={{ marginBottom: '12px' }} tabIndex="0">
-              <strong>Medication List:</strong> Keep an updated list of all medications for emergency responders
-            </li>
-            <li style={{ marginBottom: '12px' }} tabIndex="0">
-              <strong>Pharmacy Contact:</strong> Have your pharmacy's phone number readily available
-            </li>
-            <li style={{ marginBottom: '12px' }} tabIndex="0">
-              <strong>Doctor's Number:</strong> Contact your healthcare provider for non-emergency concerns
-            </li>
-            <li tabIndex="0">
-              <strong>Allergy Information:</strong> Inform emergency responders of any known allergies
-            </li>
-          </ul>
+          <div style={{ fontSize: '18px', color: '#b91c1c' }}>
+            <p style={{ marginBottom: '10px' }}>
+              <strong>Emergency Mode:</strong> Say <strong>"Call Emergency"</strong> anytime to dial 108 immediately.
+            </p>
+            <p>
+              You can also press the specialized Red Button below.
+            </p>
+          </div>
         </section>
+
+        {/* FLOATING EMERGENCY BUTTON */}
+        <button
+          onClick={() => {
+            announce("Calling Emergency Services");
+            window.open('tel:108', '_self');
+          }}
+          style={{
+            position: 'fixed',
+            bottom: '40px',
+            right: '40px',
+            width: '80px',
+            height: '80px',
+            borderRadius: '50%',
+            backgroundColor: '#ef4444',
+            color: 'white',
+            border: '4px solid white',
+            boxShadow: '0 10px 25px rgba(239, 68, 68, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '40px',
+            cursor: 'pointer',
+            zIndex: 9999,
+            transition: 'transform 0.2s'
+          }}
+          aria-label="Call Emergency 108"
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        >
+          📞
+        </button>
       </div>
-    </div>
+    </div >
   );
 };
 

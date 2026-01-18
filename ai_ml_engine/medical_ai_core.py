@@ -495,16 +495,16 @@ class MedicalAICore:
     def check_gpu_availability(self) -> str:
         """Check if NVIDIA GPU is available/detected"""
         try:
-            # Method 1: Check via nvidia-smi
+            # Method 1: Check Torch (Precise Model Name)
+            if torch.cuda.is_available():
+                vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+                return f"DETECTED ({torch.cuda.get_device_name(0)} - {vram_gb:.1f}GB VRAM)"
+
+            # Method 2: Check via nvidia-smi (Generic)
             import shutil
             if shutil.which('nvidia-smi'):
-                 # Could run it to get memory, but presence is enough for "Connected" status
-                 return "DETECTED (NVIDIA)"
+                 return "DETECTED (NVIDIA Generic)"
             
-            # Method 2: Check Torch (if installed with CUDA)
-            if torch.cuda.is_available():
-                return f"DETECTED ({torch.cuda.get_device_name(0)})"
-                
             return "NOT DETECTED"
         except:
             return "UNKNOWN"
@@ -527,6 +527,7 @@ class MedicalAICore:
             'model_details': {
                 'active_llm': active_text_model,
                 'active_vision': active_vision_model,
+                'available_models': self.local_llm.list_available_models(),
                 'ner': 'dslim/bert-base-NER',
                 'qa': 'deepset/roberta-base-squad2',
                 'summarizer': 'facebook/bart-large-cnn'
@@ -561,6 +562,19 @@ def process_request(ai_core: MedicalAICore, input_params: Dict[str, Any]) -> Dic
                  'side_effects': medicine_info.side_effects,
                  'warnings': medicine_info.warnings,
                  'confidence_score': medicine_info.confidence_score
+             }}
+
+        elif action == 'analyze_medicine_image':
+             image_path = input_params.get('image_path', '')
+             prompt = input_params.get('prompt', 'Identify this medicine.')
+             
+             # Use Local Multimodal LLM (Gemma 3)
+             llm_response = ai_core.local_llm.generate_image_response(image_path, prompt)
+             
+             return {'success': True, 'result': {
+                 'raw_response': llm_response.response,
+                 'confidence': llm_response.confidence,
+                 'model': llm_response.model_used
              }}
              
         elif action == 'analyze_patient_case':

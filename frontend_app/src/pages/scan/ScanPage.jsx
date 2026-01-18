@@ -4,7 +4,6 @@ import CameraCapture from '../../components/ocr/CameraCapture';
 import ImageUpload from '../../components/ocr/ImageUpload';
 import OCRResultDisplay from '../../components/ocr/OCRResultDisplay';
 import { Button } from '../../components/common/Button';
-import Alert from '../../components/common/Alert';
 import useAccessibility from '../../hooks/useAccessibility';
 import api from '../../services/api';
 import VoiceService from '../../services/voiceService';
@@ -24,7 +23,6 @@ const ScanPage = () => {
       switch (command) {
         case 'startCamera':
           if (activeTab === 'camera') {
-            // Trigger camera start
             document.querySelector('[aria-label="Capture image for OCR processing"]')?.click();
           }
           break;
@@ -35,9 +33,6 @@ const ScanPage = () => {
           if (activeTab === 'upload') {
             document.querySelector('input[type="file"]')?.click();
           }
-          break;
-        case 'stopCamera':
-          // Handle camera stop if needed
           break;
       }
     };
@@ -51,10 +46,19 @@ const ScanPage = () => {
     setError(null);
 
     try {
+      console.log('📸 Sending Capture to OCR:', imageFile);
+      if (imageFile instanceof Blob) {
+        console.log('📦 File Details:', { size: imageFile.size, type: imageFile.type });
+      }
+
       const formData = new FormData();
       formData.append('image', imageFile);
 
-      const response = await api.post('/ocr/process', formData);
+      const response = await api.post('/ocr/process', formData, {
+        headers: {
+          'Content-Type': undefined
+        }
+      });
 
       if (response.data.success) {
         setOcrResult(response.data.data);
@@ -65,9 +69,9 @@ const ScanPage = () => {
       }
     } catch (err) {
       console.error('OCR Error:', err);
+      // Don't show technical error, show user friendly state
       setError(err.message || 'Failed to process image');
       speak("Error processing image. Please try again.");
-      voiceService.speak("OCR processing failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -76,13 +80,9 @@ const ScanPage = () => {
   const handleUpload = async (imageFile) => {
     setIsLoading(true);
     setError(null);
-
     try {
       const formData = new FormData();
       formData.append('image', imageFile);
-
-      // console.log('Uploading file:', imageFile.name, imageFile.type, imageFile.size);
-
       const response = await api.post('/ocr/process', formData, {
         headers: {
           'Content-Type': undefined // Let browser set multipart/form-data with boundary
@@ -98,11 +98,8 @@ const ScanPage = () => {
       }
     } catch (err) {
       console.error('Upload Error:', err);
-      const msg = err.response?.data?.message || err.message || 'Failed to process image';
-      setError(msg);
-      alert('OCR Failed: ' + msg); // Force user to see exact cause
-      speak("Error processing uploaded image. " + msg);
-      voiceService.speak("Image processing failed: " + msg);
+      setError(err.message || 'Failed to process image');
+      speak("Error processing uploaded image.");
     } finally {
       setIsLoading(false);
     }
@@ -114,52 +111,82 @@ const ScanPage = () => {
     speak("Scan results cleared");
   };
 
+  // Reminder Modal State and Logic
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [reminderForm, setReminderForm] = useState({
+    medicineName: '',
+    dosage: '',
+    time: '09:00',
+    frequency: 'daily'
+  });
+
+  const handleSetReminder = () => {
+    if (ocrResult) {
+      const aiData = ocrResult.aiAnalysis || ocrResult;
+      setReminderForm({
+        medicineName: aiData.medicineName || '',
+        dosage: aiData.strength || aiData.dosage || '',
+        time: '09:00',
+        frequency: 'daily'
+      });
+      setShowReminderModal(true);
+      speak(`Setting reminder for ${aiData.medicineName}`);
+    }
+  };
+
+  const saveReminder = async () => {
+    try {
+      await api.post('/medicine/reminders', reminderForm);
+      speak("Reminder saved successfully");
+      voiceService.speak(`I have set a daily reminder for ${reminderForm.medicineName} at ${reminderForm.time}`);
+      setShowReminderModal(false);
+    } catch (err) {
+      console.error("Failed to save reminder", err);
+      speak("Failed to save reminder. Please try again.");
+    }
+  };
+
   return (
-    <div className="scan-page max-w-4xl mx-auto p-4">
+    <div className="scan-page max-w-4xl mx-auto p-4 font-sans relative">
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Medicine Scanner</h1>
         <p className="text-lg text-gray-600">
-          Scan medicine packages to get detailed information about dosage, usage, and side effects
+          Scan medicine packages to get detailed information and set reminders
         </p>
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-blue-800 font-medium">
-            💬 Voice Commands: Say "Start scanning" or "Upload image"
-          </p>
-        </div>
       </div>
 
-      <Card className="p-6">
+      <Card className="p-6 border-2 border-blue-100 shadow-md">
         {/* Tab Navigation */}
-        <div className="flex border-b border-gray-200 mb-6">
+        <div className="flex border-b border-gray-200 mb-6 gap-4">
           <button
-            className={`py-2 px-4 font-medium text-sm ${activeTab === 'camera'
-              ? 'border-b-2 border-blue-500 text-blue-600'
-              : 'text-gray-500 hover:text-gray-700'
+            className={`py-3 px-6 font-semibold text-lg rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'camera'
+              ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500'
+              : 'text-gray-500 hover:bg-gray-50'
               }`}
             onClick={() => setActiveTab('camera')}
             aria-selected={activeTab === 'camera'}
             role="tab"
           >
-            Camera Scan
+            <span>📷</span> Camera Scan
           </button>
           <button
-            className={`py-2 px-4 font-medium text-sm ${activeTab === 'upload'
-              ? 'border-b-2 border-blue-500 text-blue-600'
-              : 'text-gray-500 hover:text-gray-700'
+            className={`py-3 px-6 font-semibold text-lg rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'upload'
+              ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500'
+              : 'text-gray-500 hover:bg-gray-50'
               }`}
             onClick={() => setActiveTab('upload')}
             aria-selected={activeTab === 'upload'}
             role="tab"
           >
-            Upload Image
+            <span>🖼️</span> Upload Image
           </button>
         </div>
 
         {/* Tab Content */}
-        <div className="tab-content">
+        <div className="tab-content min-h-[400px]">
           {activeTab === 'camera' && (
             <div className="camera-tab">
-              <h2 className="text-xl font-semibold mb-4">Scan Using Camera</h2>
+              <h2 className="text-xl font-semibold mb-2 text-gray-800">Scan Using Camera</h2>
               <p className="text-gray-600 mb-6">
                 Point your camera at the medicine package and capture a clear image of the label
               </p>
@@ -169,7 +196,7 @@ const ScanPage = () => {
 
           {activeTab === 'upload' && (
             <div className="upload-tab">
-              <h2 className="text-xl font-semibold mb-4">Upload Medicine Image</h2>
+              <h2 className="text-xl font-semibold mb-2 text-gray-800">Upload Medicine Image</h2>
               <p className="text-gray-600 mb-6">
                 Upload a clear photo of the medicine package or prescription
               </p>
@@ -178,51 +205,129 @@ const ScanPage = () => {
           )}
         </div>
 
-        {/* OCR Result Section */}
+        {/* Results Section */}
         {(ocrResult || error) && (
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">OCR Results</h2>
-              <Button variant="outline" onClick={handleReset}>
-                Scan Another
-              </Button>
+          <div className="mt-8 pt-6 border-t-2 border-gray-100">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <span>📊</span> Scan Results
+              </h2>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={handleReset} className="gap-2 border-gray-300">
+                  <span>🔄</span> Scan Again
+                </Button>
+              </div>
             </div>
 
             <OCRResultDisplay
               result={ocrResult}
               isLoading={isLoading}
               error={error}
+              onSetReminder={handleSetReminder}
             />
           </div>
         )}
 
         {isLoading && (
-          <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200 animate-pulse text-center">
-            <h3 className="text-yellow-800 font-semibold text-lg flex items-center justify-center gap-2">
-              <svg className="animate-spin h-5 w-5 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Analyzing Medicine...
-            </h3>
-            <p className="text-yellow-700 mt-2">
-              This might take a moment while we wake up the AI brain. <br />
-              Please wait...
-            </p>
+          <div className="mt-8 p-8 bg-blue-50 rounded-xl border-2 border-blue-100 flex flex-col items-center justify-center text-center">
+            <div className="animate-spin text-4xl mb-4">⌛</div>
+            <h3 className="text-xl font-bold text-blue-800 mb-2">Analyzing Image...</h3>
+            <p className="text-blue-600">Identifying medicine details and extracting text.</p>
           </div>
         )}
+
       </Card>
 
-      {/* Voice Control Section */}
-      <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-        <h3 className="font-medium text-green-800 flex items-center mb-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7 7 0 0015.73 17c.21.21.42.41.63.61.21.2.42.4.63.6.2-.2.41-.4.63-.6.21-.2.42-.4.63-.6A7 7 0 0011 14.93V12a1 1 0 10-2 0v2.93A7 7 0 004.27 17c.21.21.42.41.63.61.21.2.42.4.63.6.2-.2.41-.4.63-.6.21-.2.42-.4.63-.6A7 7 0 009 14.93V12a1 1 0 10-2 0v2.93z" clipRule="evenodd" />
-          </svg>
-          Voice Control Active
+      {/* Reminder Modal Overlay */}
+      {showReminderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border-2 border-purple-100">
+            <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-3">
+              <h2 className="text-2xl font-bold text-purple-900 flex items-center gap-2">
+                <span>⏰</span> Set Medicine Reminder
+              </h2>
+              <button onClick={() => setShowReminderModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Medicine Name</label>
+                <div className="flex items-center gap-2 border rounded-lg p-2 bg-purple-50 border-purple-100">
+                  <span>💊</span>
+                  <input
+                    type="text"
+                    value={reminderForm.medicineName}
+                    onChange={e => setReminderForm({ ...reminderForm, medicineName: e.target.value })}
+                    className="bg-transparent w-full outline-none font-semibold text-purple-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Dosage</label>
+                <div className="flex items-center gap-2 border rounded-lg p-2 border-gray-200">
+                  <span>💉</span>
+                  <input
+                    type="text"
+                    value={reminderForm.dosage}
+                    onChange={e => setReminderForm({ ...reminderForm, dosage: e.target.value })}
+                    placeholder="e.g. 1 tablet"
+                    className="bg-transparent w-full outline-none text-gray-800"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Time</label>
+                  <div className="flex items-center gap-2 border rounded-lg p-2 border-gray-200">
+                    <span>🕐</span>
+                    <input
+                      type="time"
+                      value={reminderForm.time}
+                      onChange={e => setReminderForm({ ...reminderForm, time: e.target.value })}
+                      className="bg-transparent w-full outline-none text-gray-800"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Frequency</label>
+                  <div className="flex items-center gap-2 border rounded-lg p-2 border-gray-200">
+                    <span>🔄</span>
+                    <select
+                      value={reminderForm.frequency}
+                      onChange={e => setReminderForm({ ...reminderForm, frequency: e.target.value })}
+                      className="bg-transparent w-full outline-none text-gray-800"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="twice_daily">Twice Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="as_needed">As Needed</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <Button onClick={() => setShowReminderModal(false)} variant="outline" className="flex-1">
+                Cancel
+              </Button>
+              <Button onClick={saveReminder} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white">
+                Save Reminder
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Accessibility Footer */}
+      <div className="mt-6 p-4 bg-gray-100 rounded-lg border-l-4 border-blue-500">
+        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-lg mb-1">
+          <span className="text-2xl">♿</span> Accessibility Tip
         </h3>
-        <p className="text-green-700">
-          Say "Help" for voice commands • Press Spacebar to toggle listening
+        <p className="text-gray-700">
+          Press <strong>Ctrl+Shift+A</strong> to toggle audio descriptions for all text content on this page.
         </p>
       </div>
     </div>

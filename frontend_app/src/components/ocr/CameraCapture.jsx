@@ -21,6 +21,7 @@ const CameraCapture = ({ onCapture, isLoading }) => {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [guidance, setGuidance] = useState("Align medicine in frame...");
   const [isSmartMode, setIsSmartMode] = useState(true); // Auto-capture on by default
+  const [orientation, setOrientation] = useState('horizontal'); // 'horizontal' | 'vertical'
 
   // Analysis State
   const lastFrameData = useRef(null);
@@ -101,29 +102,51 @@ const CameraCapture = ({ onCapture, isLoading }) => {
     };
   }, [selectedDevice]); // Removed speak from dependency to avoid loop
 
-  // 2. Capture Logic
+  // 2. Capture Logic (SMART CROP)
   const captureImage = useCallback(() => {
     if (videoRef.current && canvasRef.current && !isCapturing.current) {
       isCapturing.current = true;
-      speak("Perfect. Capturing now.");
+      speak("Perfect! Holding for clarity...");
 
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0);
+      // VIDEO DIMENSIONS
+      const vWidth = video.videoWidth;
+      const vHeight = video.videoHeight;
 
-      canvas.toBlob((blob) => {
-        if (onCapture) onCapture(blob);
-        // Reset after a delay if needed
-        setTimeout(() => { isCapturing.current = false; }, 4000);
-      }, 'image/jpeg', 0.9);
+      // -- NEW: EXPANDED ROI (Synchronized with analysis) --
+      let cropWidth, cropHeight;
+      if (orientation === 'horizontal') {
+        cropWidth = vWidth * 0.92; // Edge to edge capture
+        cropHeight = vHeight * 0.7; // Taller for multi-line labels
+      } else {
+        cropWidth = vWidth * 0.7;
+        cropHeight = vHeight * 0.92; // Taller for vertical bottles
+      }
+
+      const startX = (vWidth - cropWidth) / 2;
+      const startY = (vHeight - cropHeight) / 2;
+
+      // STABILIZATION DELAY: Wait 250ms for final autofocus/exposure
+      setTimeout(() => {
+        // Set Canvas to CROP size
+        canvas.width = cropWidth;
+        canvas.height = cropHeight;
+
+        // Draw the high-res crop
+        context.drawImage(video, startX, startY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+        canvas.toBlob((blob) => {
+          if (onCapture) onCapture(blob); // Send cropped blob
+          setTimeout(() => { isCapturing.current = false; }, 3000);
+        }, 'image/jpeg', 0.98); // Ultra high quality
+      }, 250);
     }
-  }, [onCapture]); // Removed speak from dependency
+  }, [onCapture, orientation]); // Added orientation to dependency // Removed speak from dependency
 
-  // 3. Image Analysis Loop
+  // 3. Image Analysis Loop (FOCUSED)
   useEffect(() => {
     if (!hasPermission || !isSmartMode || isLoading) return;
 
@@ -132,14 +155,32 @@ const CameraCapture = ({ onCapture, isLoading }) => {
 
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true }); // Performance Fix
 
-      // Use small size for analysis efficiency
-      const width = 100;
-      const height = 100;
+      // Use expanded ROI for analysis
+      const width = 120; // Slightly higher analysis resolution
+      const height = orientation === 'horizontal' ? 80 : 120;
       canvas.width = width;
       canvas.height = height;
-      ctx.drawImage(video, 0, 0, width, height);
+
+      // Analyze Same Crop as captureImage
+      const vWidth = video.videoWidth;
+      const vHeight = video.videoHeight;
+
+      let cropW, cropH;
+      if (orientation === 'horizontal') {
+        cropW = vWidth * 0.92;
+        cropH = vHeight * 0.7;
+      } else {
+        cropW = vWidth * 0.7;
+        cropH = vHeight * 0.92;
+      }
+
+      const startX = (vWidth - cropW) / 2;
+      const startY = (vHeight - cropH) / 2;
+
+      // Synchronized draw
+      ctx.drawImage(video, startX, startY, cropW, cropH, 0, 0, width, height);
 
       const frame = ctx.getImageData(0, 0, width, height);
       const data = frame.data;
@@ -151,19 +192,18 @@ const CameraCapture = ({ onCapture, isLoading }) => {
       }
       const avgBrightness = totalBrightness / (data.length / 4);
 
-      // -- Metric 2: Stability (Diff from last frame) --
+      // -- Metric 2: Stability --
       let diffScore = 0;
       if (lastFrameData.current) {
         const prev = lastFrameData.current;
-        for (let i = 0; i < data.length; i += 40) { // Check every 10th pixel for speed
+        for (let i = 0; i < data.length; i += 40) {
           diffScore += Math.abs(data[i] - prev[i]);
         }
         diffScore = diffScore / (data.length / 40);
       }
-      // Store current frame copy for next comparison
       lastFrameData.current = new Uint8ClampedArray(data);
 
-      // -- Metric 3: Edge Density (Text/Detail Detection) --
+      // -- Metric 3: Edge Density (Text Detection) --
       let edgeScore = 0;
       for (let i = 0; i < data.length - 4; i += 4) {
         const current = (data[i] + data[i + 1] + data[i + 2]) / 3;
@@ -172,82 +212,136 @@ const CameraCapture = ({ onCapture, isLoading }) => {
       }
       edgeScore = edgeScore / (data.length / 4);
 
-      const TEXT_DETAIL_THRESHOLD = 20;
+      // Tuned Thresholds for "Strip Detection"
+      // Tuned Thresholds (Optimized for Speed)
+      const TEXT_DETAIL_THRESHOLD = 8; // Very low
+      const STABILITY_THRESHOLD = 25;  // Tolerant
 
-      // -- Guidance Logic --
+      // Guidance (Audio & Visual)
       if (avgBrightness < BRIGHTNESS_THRESHOLD) {
-        const msg = "Too dark. Turn on a light.";
+        const msg = "Too dark. Please turn on a light.";
         if (guidance !== msg) {
           setGuidance(msg);
-          speak(msg);
+          // throttle speaking
+          if (stabilityCounter.current % 5 === 0) speak(msg);
         }
         stabilityCounter.current = 0;
       } else if (diffScore > STABILITY_THRESHOLD) {
-        const msg = "Hold steady.";
-        if (guidance !== msg) {
-          setGuidance(msg);
-          speak(msg); // Only speak occasionally?
-        }
+        setGuidance("Hold medicine steady...");
         stabilityCounter.current = 0;
       } else if (edgeScore < TEXT_DETAIL_THRESHOLD) {
-        const msg = "Show medicine label.";
-        if (guidance !== msg) {
-          setGuidance(msg);
-          speak(msg);
-        }
+        const msg = orientation === 'horizontal'
+          ? "No text found. Move medicine to center."
+          : "No text. Align vertical strip.";
+        if (guidance !== msg) setGuidance(msg);
         stabilityCounter.current = 0;
       } else {
-        // Bright & Stable
+        // High density + Stable = Valid Capture
+        const msg = "Perfect! Capturing...";
+        if (guidance !== msg) setGuidance(msg);
         stabilityCounter.current += 1;
-        const msg = "Holding...";
-        setGuidance(msg);
 
-        // If stable for 2 cycles (approx 2s), capture
-        if (stabilityCounter.current > 2) {
+        // INSTANT TRIGGER: Very clear text + minor stability
+        const instantTrigger = edgeScore > 30 && stabilityCounter.current > 0;
+        // STANDARD TRIGGER: Stable for ~1 second (3-4 checks)
+        const standardTrigger = stabilityCounter.current > 3;
+
+        if (instantTrigger || standardTrigger) {
+          if (navigator.vibrate) navigator.vibrate(200);
           captureImage();
           stabilityCounter.current = 0;
         }
       }
     };
 
-    analysisIntervalRef.current = setInterval(analyzeFrame, ANALYSIS_INTERVAL);
+    // SPEED UP ANALYSIS: Check every 300ms (approx)
+    analysisIntervalRef.current = setInterval(analyzeFrame, 300);
     return () => {
       if (analysisIntervalRef.current) clearInterval(analysisIntervalRef.current);
     };
-  }, [hasPermission, isSmartMode, isLoading, captureImage, guidance]); // Removed speak to avoid loop
+  }, [hasPermission, isSmartMode, isLoading, captureImage]);
 
 
   // Helper for manual device switch
   const handleDeviceChange = (e) => setSelectedDevice(e.target.value);
 
   return (
-    <div className="camera-capture">
-      <div className="relative w-full max-w-md mx-auto bg-gray-900 rounded-lg overflow-hidden border-4 border-blue-500">
+    <div className="camera-capture w-full flex flex-col items-center">
+      {/* 2. CAMERA CONTAINER (Larger) */}
+      <div className="relative w-full max-w-4xl bg-black rounded-xl overflow-hidden shadow-2xl border-4 border-blue-500 aspect-video">
 
         {/* Status Overlay */}
-        <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-70 text-white p-3 text-center text-lg font-bold z-10 transition-all">
+        <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-60 text-white p-4 text-center text-xl font-bold z-20 backdrop-blur-sm">
           {isLoading ? "Processing..." : guidance}
         </div>
 
+        {/* SCAN ZONE OVERLAY (Visual Guide) */}
+        <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
+          {/* Center Focus Box (Matching ROI) */}
+          <div
+            className={`border-4 ${isSmartMode ? 'border-dashed border-green-400' : 'border-white'} rounded-xl opacity-70 flex items-center justify-center`}
+            style={{
+              width: orientation === 'horizontal' ? '92%' : '70%',
+              height: orientation === 'horizontal' ? '70%' : '92%'
+            }}
+          >
+            {/* Crosshair or Center Line */}
+            <div className="w-full h-px bg-white opacity-30 absolute"></div>
+            {!hasPermission && <span className="text-white text-lg">Waiting for Camera...</span>}
+          </div>
+
+          {/* Corner Brackets */}
+          <div className="absolute top-8 left-8 w-16 h-16 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
+          <div className="absolute top-8 right-8 w-16 h-16 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
+          <div className="absolute bottom-8 left-8 w-16 h-16 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
+          <div className="absolute bottom-8 right-8 w-16 h-16 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
+        </div>
+
         {!hasPermission && !error && (
-          <div className="flex items-center justify-center h-64 bg-gray-800">
+          <div className="flex items-center justify-center h-full bg-gray-900">
             <LoadingSpinner />
           </div>
         )}
 
-        {error && <div className="p-4"><Alert type="error" message={error} /></div>}
+        {error && <div className="p-8"><Alert type="error" message={error} /></div>}
 
         <video
           ref={videoRef}
           autoPlay playsInline muted
-          className={`w-full h-auto ${!hasPermission ? 'hidden' : ''}`}
+          className={`w-full h-full object-cover ${!hasPermission ? 'hidden' : ''}`}
         />
         <canvas ref={canvasRef} className="hidden" />
       </div>
 
-      <div className="mt-4 flex flex-col items-center gap-4">
+      <div className="mt-4 flex flex-col items-center gap-4 w-full max-w-4xl">
+        {/* CONTROLS ROW: Device Select & Orientation */}
+        <div className="flex gap-4 w-full">
+          <div className="flex-1">
+            <select
+              className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-600 outline-none focus:border-blue-500"
+              value={selectedDevice || ''}
+              onChange={handleDeviceChange}
+              disabled={devices.length <= 1}
+              aria-label="Select Camera Device"
+            >
+              {devices.map(d => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || `Camera ${d.deviceId.slice(0, 5)}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Button
+            onClick={() => setOrientation(prev => prev === 'horizontal' ? 'vertical' : 'horizontal')}
+            className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 flex items-center gap-2 transition-transform active:scale-95`}
+          >
+            <span>🔄</span> {orientation === 'horizontal' ? 'Vertical Mode' : 'Horizontal Mode'}
+          </Button>
+        </div>
+
         {/* Smart Mode Toggle */}
-        <label className="flex items-center gap-2 cursor-pointer bg-blue-50 p-2 rounded-lg border border-blue-200">
+        <label className="flex items-center gap-2 cursor-pointer bg-blue-50 p-2 rounded-lg border border-blue-200 w-full justify-center">
           <input
             type="checkbox"
             checked={isSmartMode}

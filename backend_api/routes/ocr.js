@@ -49,10 +49,14 @@ const upload = multer({
 router.post('/process', protect, upload.single('image'), [
   body('confidenceThreshold').optional().isFloat({ min: 0, max: 100 })
 ], async (req, res) => {
-  console.log('OCR Request Headers:', req.headers['content-type']);
+  console.log('🔍 OCR Debug - Headers:', req.headers['content-type']);
+  console.log('🔍 OCR Debug - File:', req.file ? `${req.file.originalname} (${req.file.size} bytes)` : 'MISSING');
+  console.log('🔍 OCR Debug - Body:', req.body);
+
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ OCR Validation Errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation error',
@@ -61,6 +65,7 @@ router.post('/process', protect, upload.single('image'), [
     }
 
     if (!req.file) {
+      console.log('❌ OCR Error: No file uploaded (req.file is undefined)');
       return res.status(400).json({
         success: false,
         message: 'No image file provided'
@@ -79,6 +84,22 @@ router.post('/process', protect, upload.single('image'), [
           platform: req.get('Sec-CH-UA-Platform')
         }
       });
+
+      // Handle AI Identification Rejection
+      if (ocrResult.error) {
+        console.warn("🚫 Medicine Identification Rejected:", ocrResult.error);
+        // We still consider the request 'successful' in terms of processing, 
+        // but return the AI's rejection message.
+        return res.json({
+          success: false, // Mark as false because identification failed
+          message: ocrResult.error,
+          data: {
+            error: ocrResult.error,
+            aiAnalysis: { error: ocrResult.error },
+            engine: ocrResult.engine
+          }
+        });
+      }
 
       // Save OCR result to database
       const ocrRecord = new OcrResult({
